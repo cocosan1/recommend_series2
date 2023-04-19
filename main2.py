@@ -74,35 +74,35 @@ if target != '':
         st.caption('df_target_sales')
 
      #******************アイテムベース*******************************
-    #recomenndリスト作成のための計算
-    #相関係数×シリーズ売上の一覧
-    sim_candidates = pd.Series()
-    for i in range(0, len(df_target_sales.index)):
-        # print('adding sims for ' + target_sales.index[i] + '...')
-        #シリーズ毎に相関表作成 series型
-        sims = df_corr[df_target_sales.index[i]]
-        #相関係数×シリーズ金額
-        sims = sims.map(lambda x: round(x * df_target_sales[i]))
-        sim_candidates = sim_candidates.append(sims)
+    # #recomenndリスト作成のための計算
+    # #相関係数×シリーズ売上の一覧
+    # sim_candidates = pd.Series()
+    # for i in range(0, len(df_target_sales.index)):
+    #     # print('adding sims for ' + target_sales.index[i] + '...')
+    #     #シリーズ毎に相関表作成 series型
+    #     sims = df_corr[df_target_sales.index[i]]
+    #     #相関係数×シリーズ金額
+    #     sims = sims.map(lambda x: round(x * df_target_sales[i]))
+    #     sim_candidates = sim_candidates.append(sims)
 
-    #シリーズ毎に合計
-    sim_candidates = sim_candidates.groupby(sim_candidates.index).sum()
-    sim_candidates.sort_values(ascending=False, inplace=True)
+    # #シリーズ毎に合計
+    # sim_candidates = sim_candidates.groupby(sim_candidates.index).sum()
+    # sim_candidates.sort_values(ascending=False, inplace=True)
 
-    with st.expander('相関係数×売上→シリーズ毎に集計', expanded=False):
-        st.write(sim_candidates)
-        st.caption('sim_candidates') 
+    # with st.expander('相関係数×売上→シリーズ毎に集計', expanded=False):
+    #     st.write(sim_candidates)
+    #     st.caption('sim_candidates') 
 
-    #pointsとsalesをmerge
-    df_simcan = pd.DataFrame(sim_candidates)
-    df_sales = pd.DataFrame(df_target_sales)
-    df_merge = df_simcan.merge(df_sales, left_index=True, right_index=True, how='right')
-    df_merge = df_merge.sort_values(0, ascending=False)
-    df_merge.columns = ['points', 'sales'] 
+    # #pointsとsalesをmerge
+    # df_simcan = pd.DataFrame(sim_candidates)
+    # df_sales = pd.DataFrame(df_target_sales)
+    # df_merge = df_simcan.merge(df_sales, left_index=True, right_index=True, how='right')
+    # df_merge = df_merge.sort_values(0, ascending=False)
+    # df_merge.columns = ['points', 'sales'] 
 
-    with st.expander('pointとsalesを一覧化', expanded=False):
-        st.write(df_merge) 
-        st.caption('df_merge') 
+    # with st.expander('pointとsalesを一覧化', expanded=False):
+    #     st.write(df_merge) 
+    #     st.caption('df_merge') 
 
     st.markdown('####  ３．展示品の選択')
 
@@ -296,88 +296,6 @@ if target != '':
     st.table(df_problem_series) 
     st.caption('df_problem_series')
 
-    #******************ユーザーベース*******************************
-    #類似度の高いユーザーの抽出
-    #データの正規化 zenkoku3 ユーザー毎index得意先/colシリーズの売り上げ表
-    df_zenkoku3_norm = df_zenkoku3.apply(lambda x:(x-np.min(x))/(np.max(x)-np.min(x)),axis=1)
-    #axis=1 行方向
-    df_zenkoku3_norm = df_zenkoku3_norm.fillna(0) 
-
-    # コサイン類似度を計算
-
-    #成分のほとんどが0である疎行列はリストを圧縮して表す方式
-    from scipy.sparse import csr_matrix 
-
-    #2つのベクトルがなす角のコサイン値のこと。1なら「似ている」を、-1なら「似ていない」
-    from sklearn.metrics.pairwise import cosine_similarity
-
-    zenkoku3_sparse = csr_matrix(df_zenkoku3_norm.values)
-    user_sim = cosine_similarity(zenkoku3_sparse)
-    user_sim_df = pd.DataFrame(user_sim,index=df_zenkoku3_norm.index,columns=df_zenkoku3_norm.index)
-
-    with st.expander('ユーザー同士のコサイン類似度 1:似ている/-1似ていない'):
-        st.write(user_sim_df)
-        st.caption('user_sim_df')
-
-    # ユーザーtarget_nameと類似度の高いユーザー上位3店を抽出する
-    sim_users = user_sim_df.loc[target].sort_values(ascending=False)[0:5]
-
-    # ユーザーのインデックスをリストに変換
-    sim_users_list = sim_users.index.tolist()
-    #listからtarget_nameを削除
-
-    #targetと同じ得意先のデータを削除
-    sim_users_list2 = []
-    for name in sim_users_list:
-        if name[:3] not in target:
-            sim_users_list2.append(name)
-
-    #類似度の高いユーザーに絞ったデータ作成
-    # 類似度の高い上位得意先のスコア情報を集めてデータフレームに格納
-    sim_df = pd.DataFrame()
-    count = 0
-    
-    for i in df_zenkoku3_norm.iloc[:,0].index: #得意先名
-        if i in sim_users_list2:
-            #iloc[数字]でindexのみ指定可
-            sim_df = pd.concat([sim_df,pd.DataFrame(df_zenkoku3_norm.iloc[count]).T])
-        count += 1
-
-    with st.expander('類似性の高い得意先/売上/標準化', expanded=False):
-        st.write(sim_df)
-        st.caption('sim_df')    
-
-    # ユーザーtarget_nameの販売シリーズを取得する
-    df_target_sales = df_zenkoku3[df_zenkoku3.index==target].T
-
-    # # 未販売リストを作る
-    # nontenji_list = list(set(df_zenkoku3_norm.columns) - set(tenji_series))
-    # #未販売シリーズのdf
-    # sim_df = sim_df[nontenji_list]
-
-    with st.expander('類似性の高い得意先/売上/標準化', expanded=False):
-        st.write(sim_df)
-        st.caption('sim_df') 
-
-     #各シリーズの評点の平均をとる/店を横断
-    score = []
-    for i in range(len(sim_df.columns)):
-        #シリーズ毎に平均を出す
-        mean_score = sim_df.iloc[:,i].mean()
-        #seriesのname取り出し　columnで絞った場合はcolumns名
-        name = sim_df.iloc[:,i].name
-        #scoreにlist形式でシリーズ名とスコアを格納
-        score.append([name, mean_score])
-    # 集計結果からスコアの高い順にソートする
-    #１つのlistに２カラム分入っている為list(zip())不要　
-    #カラム名指定していない為0 1
-    df_score_data = pd.DataFrame(score, columns=['cust', 'point']).sort_values('point', ascending=False)
-    df_score_data = df_score_data.set_index('cust')  
-
-    with st.expander('類似性の高い得意先/売上/標準化/平均', expanded=False):
-        st.write(df_score_data) 
-        st.caption('df_score_data')
-
     st.markdown('####  ４．展示候補シリーズ')
 
     #アイテムベース　相関係数×直近の売上
@@ -423,6 +341,90 @@ if target != '':
     df_merge1 = df_merge1.sort_values('point', ascending=False)
     st.write(df_merge1)
         
+
+    # #******************ユーザーベース*******************************
+    # #類似度の高いユーザーの抽出
+    # #データの正規化 zenkoku3 ユーザー毎index得意先/colシリーズの売り上げ表
+    # df_zenkoku3_norm = df_zenkoku3.apply(lambda x:(x-np.min(x))/(np.max(x)-np.min(x)),axis=1)
+    # #axis=1 行方向
+    # df_zenkoku3_norm = df_zenkoku3_norm.fillna(0) 
+
+    # # コサイン類似度を計算
+
+    # #成分のほとんどが0である疎行列はリストを圧縮して表す方式
+    # from scipy.sparse import csr_matrix 
+
+    # #2つのベクトルがなす角のコサイン値のこと。1なら「似ている」を、-1なら「似ていない」
+    # from sklearn.metrics.pairwise import cosine_similarity
+
+    # zenkoku3_sparse = csr_matrix(df_zenkoku3_norm.values)
+    # user_sim = cosine_similarity(zenkoku3_sparse)
+    # user_sim_df = pd.DataFrame(user_sim,index=df_zenkoku3_norm.index,columns=df_zenkoku3_norm.index)
+
+    # with st.expander('ユーザー同士のコサイン類似度 1:似ている/-1似ていない'):
+    #     st.write(user_sim_df)
+    #     st.caption('user_sim_df')
+
+    # # ユーザーtarget_nameと類似度の高いユーザー上位3店を抽出する
+    # sim_users = user_sim_df.loc[target].sort_values(ascending=False)[0:5]
+
+    # # ユーザーのインデックスをリストに変換
+    # sim_users_list = sim_users.index.tolist()
+    # #listからtarget_nameを削除
+
+    # #targetと同じ得意先のデータを削除
+    # sim_users_list2 = []
+    # for name in sim_users_list:
+    #     if name[:3] not in target:
+    #         sim_users_list2.append(name)
+
+    # #類似度の高いユーザーに絞ったデータ作成
+    # # 類似度の高い上位得意先のスコア情報を集めてデータフレームに格納
+    # sim_df = pd.DataFrame()
+    # count = 0
+    
+    # for i in df_zenkoku3_norm.iloc[:,0].index: #得意先名
+    #     if i in sim_users_list2:
+    #         #iloc[数字]でindexのみ指定可
+    #         sim_df = pd.concat([sim_df,pd.DataFrame(df_zenkoku3_norm.iloc[count]).T])
+    #     count += 1
+
+    # with st.expander('類似性の高い得意先/売上/標準化', expanded=False):
+    #     st.write(sim_df)
+    #     st.caption('sim_df')    
+
+    # # ユーザーtarget_nameの販売シリーズを取得する
+    # df_target_sales = df_zenkoku3[df_zenkoku3.index==target].T
+
+    # # # 未販売リストを作る
+    # # nontenji_list = list(set(df_zenkoku3_norm.columns) - set(tenji_series))
+    # # #未販売シリーズのdf
+    # # sim_df = sim_df[nontenji_list]
+
+    # with st.expander('類似性の高い得意先/売上/標準化', expanded=False):
+    #     st.write(sim_df)
+    #     st.caption('sim_df') 
+
+    #  #各シリーズの評点の平均をとる/店を横断
+    # score = []
+    # for i in range(len(sim_df.columns)):
+    #     #シリーズ毎に平均を出す
+    #     mean_score = sim_df.iloc[:,i].mean()
+    #     #seriesのname取り出し　columnで絞った場合はcolumns名
+    #     name = sim_df.iloc[:,i].name
+    #     #scoreにlist形式でシリーズ名とスコアを格納
+    #     score.append([name, mean_score])
+    # # 集計結果からスコアの高い順にソートする
+    # #１つのlistに２カラム分入っている為list(zip())不要　
+    # #カラム名指定していない為0 1
+    # df_score_data = pd.DataFrame(score, columns=['cust', 'point']).sort_values('point', ascending=False)
+    # df_score_data = df_score_data.set_index('cust')  
+
+    # with st.expander('類似性の高い得意先/売上/標準化/平均', expanded=False):
+    #     st.write(df_score_data) 
+    #     st.caption('df_score_data')
+
+
 
 
                     
