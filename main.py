@@ -20,7 +20,7 @@ st.markdown('### レコメンド アプリ/専門店')
 #データ読み込み
 df_zenkoku = pd.read_pickle('df_zenkoku7879.pickle')
 
-st.markdown('###### １．分析対象得意先の絞込み')
+st.markdown('#### １．分析対象得意先の絞込み')
 #得意先範囲の設定
 sales_max = st.number_input('分析対象得意先の売上上限を入力', key='sales_max', value=70000000)
 sales_min = st.number_input('分析対象得意先の売上下限を入力', key='sales_min', value=2000000)
@@ -34,7 +34,7 @@ img_yajirusi = Image.open('矢印.jpeg')
 st.image(img_yajirusi, width=20)
 
 #target選定用リスト
-st.markdown('######  ２．target得意先の選択')
+st.markdown('####  ２．target得意先の選択')
 cust_text = st.text_input('得意先名の一部を入力 例）ケンポ')
 
 target_list = []
@@ -59,13 +59,15 @@ if target != '':
     df_corr = df_zenkoku3.corr()
     with st.expander('相関係数表', expanded=False):
         st.write(df_corr)
+        st.caption('df_corr')
 
     #targetの売上を整理
     df_zenkoku_temp = df_zenkoku.drop(['sales', 'a_price'], axis=1)
     df_target_sales = df_zenkoku_temp.loc[target] #indexがシリーズ名/カラム名が店名のseries
 
-    with st.expander('シリーズ別売上/年間', expanded=False):
+    with st.expander('target得意先/シリーズ別売上/年間', expanded=False):
         st.write(df_target_sales)
+        st.caption('df_target_sales')
 
     #******************アイテムベース*******************************
     #recomenndリスト作成のための計算
@@ -85,6 +87,7 @@ if target != '':
 
     with st.expander('相関係数×売上→シリーズ毎に集計', expanded=False):
         st.write(sim_candidates)
+        st.caption('sim_candidates')
 
     #pointsとsalesをmerge
     df_simcan = pd.DataFrame(sim_candidates)
@@ -94,9 +97,10 @@ if target != '':
     df_merge.columns = ['points', 'sales'] 
 
     with st.expander('pointとsalesを一覧化', expanded=False):
-        st.write(df_merge)  
+        st.write(df_merge) 
+        st.caption('df_merge') 
 
-    st.markdown('######  ３．展示品の選択')
+    st.markdown('####  ３．展示品の選択')
 
     #展示品の指定
     tenji_series = st.multiselect(
@@ -138,7 +142,8 @@ if target != '':
     df_now_target['series2'] = df_now_target['シリーズ名'] + '_' + df_now_target['category']
 
     with st.expander('target得意先に絞った表', expanded=False):
-        st.write(df_now_target) 
+        st.write(df_now_target)
+        st.caption('df_now_target')
 
     #seiries2シリーズ名＋LD分類を品番に変換
 
@@ -270,6 +275,7 @@ if target != '':
     
     with st.expander('得意先別/シリーズLD別/売上表', expanded=False):
         st.write(df_now_target2)
+        st.caption('df_now_target2')
 
     #展示品に絞る
     df_now_tenji = df_now_target2.loc[tenji_series]
@@ -284,10 +290,121 @@ if target != '':
 
     st.write('動きの良くない展示シリーズ')
     st.table(df_problem_series) 
+    st.caption('df_problem_series')
 
     #******************ユーザーベース*******************************
-    #データの正規化
+    #類似度の高いユーザーの抽出
+    #データの正規化 zenkoku3 ユーザー毎index得意先/colシリーズの売り上げ表
     df_zenkoku3_norm = df_zenkoku3.apply(lambda x:(x-np.min(x))/(np.max(x)-np.min(x)),axis=1)
     #axis=1 行方向
-    df_zenkoku3_norm = df_zenkoku3_norm.fillna(0)   
+    df_zenkoku3_norm = df_zenkoku3_norm.fillna(0) 
+
+    # コサイン類似度を計算
+
+    #成分のほとんどが0である疎行列はリストを圧縮して表す方式
+    from scipy.sparse import csr_matrix 
+
+    #2つのベクトルがなす角のコサイン値のこと。1なら「似ている」を、-1なら「似ていない」
+    from sklearn.metrics.pairwise import cosine_similarity
+
+    zenkoku3_sparse = csr_matrix(df_zenkoku3_norm.values)
+    user_sim = cosine_similarity(zenkoku3_sparse)
+    user_sim_df = pd.DataFrame(user_sim,index=df_zenkoku3_norm.index,columns=df_zenkoku3_norm.index)
+
+    with st.expander('ユーザー同士のコサイン類似度 1:似ている/-1似ていない'):
+        st.write(user_sim_df)
+        st.caption('user_sim_df')
+
+    # ユーザーtarget_nameと類似度の高いユーザー上位3店を抽出する
+    sim_users = user_sim_df.loc[target].sort_values(ascending=False)[0:5]
+
+    # ユーザーのインデックスをリストに変換
+    sim_users_list = sim_users.index.tolist()
+    #listからtarget_nameを削除
+
+    #targetと同じ得意先のデータを削除
+    sim_users_list2 = []
+    for name in sim_users_list:
+        if name[:3] not in target:
+            sim_users_list2.append(name)
+
+    #類似度の高いユーザーに絞ったデータ作成
+    # 類似度の高い上位得意先のスコア情報を集めてデータフレームに格納
+    sim_df = pd.DataFrame()
+    count = 0
+    
+    for i in df_zenkoku3_norm.iloc[:,0].index: #得意先名
+        if i in sim_users_list2:
+            #iloc[数字]でindexのみ指定可
+            sim_df = pd.concat([sim_df,pd.DataFrame(df_zenkoku3_norm.iloc[count]).T])
+        count += 1
+
+    with st.expander('類似性の高い得意先/売上/標準化', expanded=False):
+        st.write(sim_df)
+        st.caption('sim_df')    
+
+    # ユーザーtarget_nameの販売シリーズを取得する
+    df_target_sales = df_zenkoku3[df_zenkoku3.index==target].T
+
+    # 未販売リストを作る
+    nontenji_list = list(set(df_zenkoku3_norm.columns) - set(tenji_series))
+    #未販売シリーズのdf
+    sim_df = sim_df[nontenji_list]
+
+    with st.expander('類似性の高い得意先/売上/標準化 ＊未販売リスト対応', expanded=False):
+        st.write(sim_df)
+        st.caption('sim_df') 
+
+    #各シリーズの評点の平均をとる/店を横断
+    score = []
+    for i in range(len(sim_df.columns)):
+        #シリーズ毎に平均を出す
+        mean_score = sim_df.iloc[:,i].mean()
+        #seriesのname取り出し　columnで絞った場合はcolumns名
+        name = sim_df.iloc[:,i].name
+        #scoreにlist形式でシリーズ名とスコアを格納
+        score.append([name, mean_score])
+    # 集計結果からスコアの高い順にソートする
+    #１つのlistに２カラム分入っている為list(zip())不要　
+    #カラム名指定していない為0 1
+    df_score_data = pd.DataFrame(score, columns=['cust', 'points']).sort_values('points', ascending=False)
+    df_score_data = df_score_data.set_index('cust')  
+
+    with st.expander('類似性の高い得意先/売上/標準化/平均 ＊未販売リスト対応', expanded=False):
+        st.write(df_score_data) 
+        st.caption('df_score_data')
+
+    st.markdown('####  ４．展示候補シリーズ')
+
+    #アイテムベース　相関係数×直近の売上
+    #recomenndリスト作成のための計算
+    #相関係数×シリーズ売上の一覧
+
+    #sales行の削除
+    df_now_target2.drop(index='sales', inplace=True)
+    sim_candidates = pd.Series()
+    for i in range(0, len(df_target_sales.index)):
+        # print('adding sims for ' + target_sales.index[i] + '...')
+        #シリーズ毎に相関表作成 series型
+        sims = df_corr[df_now_target2.index[i]]
+        #相関係数×シリーズ金額
+        sims = sims.map(lambda x: round(x * df_now_target2[i]))
+        sim_candidates = sim_candidates.append(sims)
+
+    #シリーズ毎に合計
+    sim_candidates = sim_candidates.groupby(sim_candidates.index).sum()
+    sim_candidates.sort_values(ascending=False, inplace=True)
+    st.write(sim_candidates)
+
+    col1, col2 = st.columns(2)
+
+    with col1:
+        #展示している商品は削る
+        sim_candidates2 = df_merge.drop(index=tenji_series)
+        sim_candidates2 = sim_candidates2['points']
+        st.markdown('##### アイテムベース分析')
+        st.table(sim_candidates2[:5])
+
+        st.caption('※参考　展示品のpoints/sales79期')
+        st.table(df_merge[:5])          
       
