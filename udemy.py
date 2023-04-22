@@ -54,7 +54,8 @@ if target != '':
     df_zenkoku3 = df_zenkoku3.fillna(0)
     df_zenkoku3t = df_zenkoku3.T
 
-    st.write(df_zenkoku3t)
+    with st.expander('得意先別/アイテム別売上'):
+        st.write(df_zenkoku3t)
 
         #targetの売上を整理
     df_zenkoku_temp = df_zenkoku.drop(['sales', 'a_price'], axis=1)
@@ -232,10 +233,23 @@ if target != '':
                                   vzd_list, sld_list, fxd_list, rkd_list, psd_list,\
                                   snl_list, hkl_list, wkl_list, kdl_list, wql_list, wnl_list, fxl_list,\
                                   psl_list, sdl_list)), \
-                         index=['売上'],\
+                         index=['金額'],\
                           columns=['sales', 'hts_d', 'kx_d', 'sg_d', 'kd_d', 'sn_d', 'vz_d', 'sl_d',\
                                    'fx_d', 'rk_d', 'ps_d',\
                                    'sn_l', 'hk_l', 'wk_l', 'kd_l', 'wq_l', 'wn_l', 'fx_l', 'ps_l', 'sd_l']).T
+
+    #展示品の売り上げ上限を入力
+    max_line = st.number_input('いくら以下を抽出するか', key='max_line', value=100000)
+    #展示品に絞込み
+    df_cold_sales = df_now_target2.loc[tenji_series]
+    
+    #売上下限以下のdfを作成
+    df_cold_sales = df_cold_sales[df_cold_sales['金額'] <= max_line]
+    df_cold_sales = df_cold_sales.sort_values('金額', ascending=False)
+    
+    st.markdown('##### 動いていない展示品')
+    st.caption('df_cold_sales')
+    st.write(df_cold_sales) 
     
     with st.expander('得意先別/シリーズLD別/売上表', expanded=False):
         st.write(df_now_target2)
@@ -254,9 +268,9 @@ if target != '':
     min_line = st.number_input('展示品の売上下限を入力', key='min_line', value=500000)
 
     #売上下限以下のdfを作成
-    df_hot_sales = df_now_target2[df_now_target2['売上'] >= min_line]
+    df_hot_sales = df_now_target2[df_now_target2['金額'] >= min_line]
 
-    df_hot_sales = df_hot_sales.sort_values('売上', ascending=False)
+    df_hot_sales = df_hot_sales.sort_values('金額', ascending=False)
     st.markdown('##### 売れ筋展示品')
     st.caption('df_hot_sales')
     st.write(df_hot_sales)
