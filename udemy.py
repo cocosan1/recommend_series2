@@ -108,7 +108,7 @@ if target != '':
 
     with st.expander('target得意先に絞った表', expanded=False):
         st.write(df_now_target)
-        st.caption('df_now_target')
+        st.caption('df_now_target') 
 
     #seiries2シリーズ名＋LD分類を品番に変換
 
