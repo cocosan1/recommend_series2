@@ -11,7 +11,7 @@ from sklearn.neighbors import NearestNeighbors
 
 #st
 st.set_page_config(page_title='recommend_series')
-st.markdown('### レコメンド アプリ/専門店')
+st.markdown('### レコメンド　アイテムB アプリ/専門店')
 
 #データ読み込み
 df_zenkoku = pd.read_pickle('df_zenkoku7879.pickle')
