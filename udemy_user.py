@@ -313,7 +313,7 @@ if target != '':
             st.write(indices_f)
 
         #indexオブジェクトからlist化
-        index_list = list(df_zenkoku3.index)
+        index_list = list(df_zenkoku3m.index)
         #indicesのint化
         indices_f = [int(x) for x in indices_f]
 
@@ -368,9 +368,9 @@ if target != '':
     
 
     cust1 = df_knn.index[1]
-    df1_low['基準rate売上'] = round(df1_low[cust1]*(st_rate/ df1_low['rate']))
+    df1_low['基準rate売上'] = round(df1_low['金額']*(st_rate/ df1_low['rate']))
     df1_low['差額'] = df1_low['基準rate売上'] - df1_low['金額']
-    st.write(df1_low)
+    st.dataframe(df1_low)
 
 
 
