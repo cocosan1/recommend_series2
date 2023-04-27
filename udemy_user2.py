@@ -237,6 +237,12 @@ if target != '--得意先を選択--':
         st.write(df_zenkoku4)
         st.caption('df_zenkoku4')
 
+    with st.expander('df_zenkoku4のdescribe'):
+        st.write(df_zenkoku4.describe())
+        st.caption('df_zenkoku4のdescribe')
+        st.write((df_zenkoku4 > 0).sum())
+        st.caption('df_zenkoku4の0超えの値の数')
+
     #**************************************************最近傍探索
     #インスタンス化
     #似ている得意先上位何位まで抽出するか
@@ -308,7 +314,13 @@ if target != '--得意先を選択--':
 
     st.markdown('###### 一番似ている得意先との比較')
     df1 = comparison_cust(1)
+    df1.loc['合計'] = df1.sum(axis=0)
     st.write(df1)
+
+    #売上対比
+    sales_rate = df1.iloc[-1, 0] / df1.iloc[-1, 1]
+    st.write('売上比較　target/一番似ている得意先')
+    st.write(sales_rate)
 
     #df1の商品絞込み
     cust1 = df_knn.index[1]
@@ -316,9 +328,29 @@ if target != '--得意先を選択--':
     df2 = df1[(df1[f'{target}_now'] > 100000) | (df1[cust1] > 100000)]
     df2.sort_values(cust1, ascending=False, inplace=True)
 
-    df2['差額'] = df2[cust1] - df2[f'{target}_now']
-    st.write(df2)
+    df2['調整売上/一番似ている得意先'] = round(df2[cust1] * sales_rate)
+    df2['差額/調整後'] = df2['調整売上/一番似ている得意先'] - df2[f'{target}_now']
+    df2.sort_values('差額/調整後', ascending=False, inplace=True)
+    st.dataframe(df2)
     st.caption('両方が10万以下の商品をカット')
+
+    st.write('展示品の伸び代を見る')
+    df2_tenji = df2.loc[tenji_list]
+    df2_tenji.sort_values('差額/調整後', ascending=False, inplace=True)
+    st.dataframe(df2_tenji)
+
+    st.write('非展示品の予測売上を見る')
+
+    #非展示リストの作成
+    non_tenji_list = list(df2.index) 
+
+    for item in tenji_list:
+        non_tenji_list.remove(item) #展示アイテムを削除
+
+    df2_nontenji = df2.loc[non_tenji_list]
+    df2_nontenji.sort_values('差額/調整後', ascending=False, inplace=True)
+    st.dataframe(df2_nontenji)
+
 
     # st.markdown('###### 基準rateの設定')
     # st_rate = st.number_input('基準rate', key='st_rate')
