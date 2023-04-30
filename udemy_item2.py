@@ -247,8 +247,8 @@ if target != '--得意先を選択--':
     #学習
     neigh.fit(df_zenkoku3tm)
 
-    #指定した得意先に近い得意先を探索
-    #ここで使うdfのindexが商品名になる。itemベースとの違いはここだけ
+    #売れ筋に近いアイテム上位何位まで抽出するか
+    #ここで使うdfのindexが商品名になる。userベースとの違いはここだけ
 
     #売れ筋商品のリスト
     hot_item_list = list(df_hot_sales.index)
@@ -259,7 +259,9 @@ if target != '--得意先を選択--':
 
     df_target = df_zenkoku3tm[df_zenkoku3tm.index==t_item]
     st.write(df_target)
-    def knn():
+    def knn(t_item):
+
+        df_target = df_zenkoku3tm[df_zenkoku3tm.index==t_item]
         
         #指定した得意先に近い得意先を探索
         df_target = df_zenkoku3tm[df_zenkoku3tm.index==t_item]
@@ -269,11 +271,11 @@ if target != '--得意先を選択--':
         distance_f = distance.flatten()
         indices_f = indices.flatten()
 
-        with st.expander('distance_t/indices_t'):
-            st.caption('distance_t')
-            st.write(distance_f)
-            st.caption('indices_t')
-            st.write(indices_f)
+        # with st.expander('distance_t/indices_t'):
+        #     st.caption('distance_t')
+        #     st.write(distance_f)
+        #     st.caption('indices_t')
+        #     st.write(indices_f)
 
         #indexオブジェクトからlist化
         index_list = list(df_zenkoku3tm.index)
@@ -291,59 +293,21 @@ if target != '--得意先を選択--':
         return df_result
 
     #関数実行
-    df_knn = knn()
-
-    with st.expander('売れ筋展示品との距離', expanded=False):
-        st.markdown('###### 売れ筋展示品との距離/コサイン類似度')
-        st.write(df_knn)
-        st.caption('df_knn')
+    #一番売れている商品
+    item1 = hot_item_list[0]
+    df_item1 = knn(item1)
+    st.write(df_item1)
+    #二番目に売れている商品
+    item2 = hot_item_list[1]
+    df_item2 = knn(item2)
+    st.write(df_item2)
+    #3番目に売れている商品
+    item3 = hot_item_list[2]
+    df_item3 = knn(item3)
+    st.write(df_item3)
     
-    def comparison_cust(index_no):
-        #1番似ている得意先名抽出
-        cust1 = df_knn.index[index_no]
-        
-        #1番似ている得意先のitem別売上
-        s1 = df_zenkoku3tm.loc[cust1]
-        #target得意先のitem別売上
-        s_target = df_zenkoku3tm.loc[t_item]
-        #mergeするためdf化
-        df1 = pd.DataFrame(s1)
-        df_target = pd.DataFrame(s_target)
-        #merge
-        df_merge = df_target.merge(df1, left_index=True, right_index=True, how='outer')
-        df_merge['rate'] = df_merge[t_item] / df_merge[cust1]
-
-        return df_merge
-
-    st.markdown('###### 一番似ている得意先との比較')
-    df1 = comparison_cust(1)
-    st.write(df1)
-
-    #df1の商品絞込み
-    cust1 = df_knn.index[1]
-    #両方が10万以下をカット
-    df2 = df1[(df1[t_item] > 100000) | (df1[cust1] > 100000)]
-    df2.sort_values(cust1, ascending=False, inplace=True)
-
-    df2['差額'] = df2[cust1] - df2[t_item]
-    st.write(df2)
-    st.caption('両方が10万以下の商品をカット')
-
-    # st.markdown('###### 基準rateの設定')
-    # st_rate = st.number_input('基準rate', key='st_rate')
-
-    # st.markdown('###### 上限rateの設定')
-    # up_rate = st.number_input('上限rate', key='up_rate')
-
-
-    # st.markdown('###### 上限rate以下のアイテム表示')
-    # df1_low = df1[df1['rate'] <= up_rate]
     
 
-    # cust1 = df_knn.index[1]
-    # df1_low['基準rate売上'] = round(df1_low['金額']*(st_rate/ df1_low['rate']))
-    # df1_low['差額'] = df1_low['基準rate売上'] - df1_low['金額']
-    # st.dataframe(df1_low)
 
 
 
