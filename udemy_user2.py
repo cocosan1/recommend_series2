@@ -226,7 +226,7 @@ if target != '--得意先を選択--':
     df_hot_sales = df_hot_sales.sort_values(f'{target}_now', ascending=False)
     st.markdown('##### 売れ筋展示品')
     st.caption('df_hot_sales')
-    st.write(df_hot_sales)
+    st.table(df_hot_sales)
     
     #最近傍探索の準備　targetの最新のデータとdf_zenkoku3tをmerge
     df_zenkoku3t = df_zenkoku3.T #index:商品/col:得意先
@@ -320,21 +320,79 @@ if target != '--得意先を選択--':
         cust = df.columns[1]
         df_cust= df[cust]
         df0 =df0.merge(df_cust, left_index=True, right_index=True, how='outer')
-    # df0['平均'] = df0.mean(axis=1)
-    # df0['平均'] = df0['平均'].apply(lambda x: int(x))
-    st.table(df0) 
+    with st.expander('一覧 low_data', expanded=False):
+        st.table(df0) 
+        st.caption('df0')
 
     #似ている得意先毎にtargetとスケールを合わせたdfを作る
     df_rate = pd.DataFrame()
     for col in df0.columns:
         rate = df_calc[f'{target}_now'].sum() / df0[col].sum()
         df_temp = df0[col] * rate
-        st.write(df_temp)
-        df_temp = df_temp.apply(lambda x: int(x))
+        df_temp = df_temp.astype('int')
+        
         df_rate = df_rate.merge(df_temp, left_index=True, right_index=True, how='outer')
 
-    
-    st.table(df_rate)    
+    df_rate['平均'] = df_rate.mean(axis=1)
+    df_rate['平均'] = df_rate['平均'].astype('int')   
+
+    with st.expander('targetとスケールを合わせた'):
+     st.table(df_rate)
+     st.caption('df_rate') 
+
+    #targetと平均のmerge
+    df_mean = pd.DataFrame(df_rate['平均'])
+    df_merge = df_calc.merge(df_mean, left_index=True, right_index=True, how='outer')
+    with st.expander('targetと平均のmerge'):
+        st.write(df_merge)
+        st.caption('df_merge')
+
+    #10万以下のitemの削除
+    #削除ライン　targetの売上合計の2％
+    cut_line = df_calc[f'{target}_now'].sum() *0.02
+    df_merge_selected = df_merge[(df_merge[f'{target}_now'] > cut_line) | (df_merge['平均'] > cut_line)]
+    #round floatのケタ数指示可
+    df_merge_selected['rate'] = round(df_merge_selected[f'{target}_now'] / df_merge_selected['平均'], 2)
+    df_merge_selected['diff'] = df_merge_selected[f'{target}_now'] - df_merge_selected['平均']
+    with st.expander('削除ライン　targetの売上合計の2％'):
+        st.write(df_merge_selected)
+        st.caption('df_merge_selected')
+
+    st.write('展示品のリスト diff順')
+    tenji_list2 = []
+    for item in tenji_list:
+        if item in list(df_merge_selected.index):
+            tenji_list2.append(item)
+        else:
+            continue    
+
+    df_tenji = df_merge_selected.loc[tenji_list2]
+    df_tenji.sort_values('diff', inplace=True)
+    st.write(df_tenji)
+
+    st.write('非展示品のリスト diff順')
+    nontenji_list = []
+    for item in df_merge_selected.index:
+        if item not in tenji_list:
+            nontenji_list.append(item)
+
+
+    df_nontenji = df_merge_selected.loc[nontenji_list]
+    df_nontenji.sort_values('diff', inplace=True)
+
+    #max minの追加
+    df02 = df0.copy()
+    df02['max'] = df02.max(axis=1)
+    df02['min'] = df02.min(axis=1)
+
+    df02 = df02[['max', 'min']]
+    df_nontenjim = df_nontenji.merge(df02, left_index=True, right_index=True, how='left')
+
+    st.write(df_nontenjim)
+
+
+
+   
         
 
 
