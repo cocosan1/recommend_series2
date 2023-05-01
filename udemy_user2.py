@@ -358,6 +358,7 @@ if target != '--得意先を選択--':
         st.write(df_merge_selected)
         st.caption('df_merge_selected')
 
+    st.markdown('# ユーザーベース')
     st.write('展示品のリスト diff順')
     tenji_list2 = []
     for item in tenji_list:
@@ -390,94 +391,61 @@ if target != '--得意先を選択--':
 
     st.write(df_nontenjim)
 
+    #**********************************************************************アイテムベース
+    #**************************************************最近傍探索
+    #インスタンス化
+    #似ている得意先上位何位まで抽出するか
+    st.markdown('#### 似ているアイテムの上位何位まで抽出するか')
+    n_neighbors = st.number_input('抽出数', key='n_neighbors2', value=10)
 
-
-   
-        
-
-
-
-    # st.markdown('###### 一番似ている得意先との比較')
-    # df1 = comparison_cust(1)
-    # df1.loc['合計'] = df1.sum(axis=0)
-    # st.write(df1)
-
-    # #売れている商品トップ１０に絞る　似ている店ベース
-    # cust = df1.columns[1]
-    # df1.sort_values(cust, ascending=False, inplace=True)
-    # df1_10 = df1[:11]
-    # st.write(df1_10)
-
-    # st.markdown('###### 2番似ている得意先との比較')
-    # df2 = comparison_cust(2)
-    # df2.loc['合計'] = df2.sum(axis=0)
-
-    # #売れている商品トップ１０に絞る　似ている店ベース
-    # cust2 = df2.columns[1]
-    # df2.sort_values(cust2, ascending=False, inplace=True)
-    # df2_10 = df2[:11]
-    # st.write(df2_10)
-
-
-
-
-
-
-    # #売上対比
-    # sales_rate = df1.iloc[-1, 0] / df1.iloc[-1, 1]
-    # st.write('売上比較　target/一番似ている得意先')
-    # st.write(sales_rate)
-
-    # #df1の商品絞込み
-    # cust1 = df_knn.index[1]
-    # #両方が10万以下をカット
-    # df2 = df1[(df1[f'{target}_now'] > 100000) | (df1[cust1] > 100000)]
-    # df2.sort_values(cust1, ascending=False, inplace=True)
-
-    # df2['調整売上/一番似ている得意先'] = round(df2[cust1] * sales_rate)
-    # df2['差額/調整後'] = df2['調整売上/一番似ている得意先'] - df2[f'{target}_now']
-    # df2.sort_values('差額/調整後', ascending=False, inplace=True)
-    # st.dataframe(df2)
-    # st.caption('両方が10万以下の商品をカット')
-
-    # st.write('展示品の伸び代を見る')
-    # df2_tenji = df2.loc[tenji_list]
-    # df2_tenji.sort_values('差額/調整後', ascending=False, inplace=True)
-    # st.dataframe(df2_tenji)
-
-    # st.write('非展示品の予測売上を見る')
-
-    # #非展示リストの作成
-    # non_tenji_list = list(df2.index) 
-
-    # for item in tenji_list:
-    #     non_tenji_list.remove(item) #展示アイテムを削除
-
-    # df2_nontenji = df2.loc[non_tenji_list]
-    # df2_nontenji.sort_values('差額/調整後', ascending=False, inplace=True)
-    # st.dataframe(df2_nontenji)
-
-
-    # st.markdown('###### 基準rateの設定')
-    # st_rate = st.number_input('基準rate', key='st_rate')
-
-    # st.markdown('###### 上限rateの設定')
-    # up_rate = st.number_input('上限rate', key='up_rate')
-
-
-    # st.markdown('###### 上限rate以下のアイテム表示')
-    # df1_low = df1[df1['rate'] <= up_rate]
+    neigh = NearestNeighbors(n_neighbors=n_neighbors, metric='cosine')
+    #学習
+    df_zenkoku4t = df_zenkoku4.T
+    with st.expander('df_zenkoku4t', expanded=False):
+        st.write(df_zenkoku4t)
     
+    neigh.fit(df_zenkoku4t)
 
-    # cust1 = df_knn.index[1]
-    # df1_low['基準rate売上'] = round(df1_low['金額']*(st_rate/ df1_low['rate']))
-    # df1_low['差額'] = df1_low['基準rate売上'] - df1_low['金額']
-    # st.dataframe(df1_low)
+    #指定したアイテムに近いアイテムを探索
+    #ここで使うdfのindexがアイテムになる。itemベースとの違いはここだけ
 
+    
+    def knn2():
+        
+        #指定した得意先に近い得意先を探索
+        df_target = df_zenkoku4t[df_zenkoku4t.index==f'{target}_now']
+        distance, indices = neigh.kneighbors(df_target ) #距離/indexナンバー
 
+        #1次元リストに変換 np.flatten　元は2次元
+        distance_f = distance.flatten()
+        indices_f = indices.flatten()
 
+        with st.expander('distance_t/indices_t'):
+            st.caption('distance_t')
+            st.write(distance_f)
+            st.caption('indices_t')
+            st.write(indices_f)
 
+        #indexオブジェクトからlist化
+        index_list = list(df_zenkoku4.index)
+        #indicesのint化
+        indices_f = [int(x) for x in indices_f]
 
-            
+        #df化
+        user_list = []
+        for i in indices_f:
+            index_name = index_list[i]
+            user_list.append(index_name)
 
+        df_result = pd.DataFrame(distance_f, columns=[f'{target}_now'], index=user_list)
+        
+        return df_result
+
+    #関数実行
+    df_knn = knn()
+
+    with st.expander('売れ筋展示品との距離', expanded=False):
+        st.markdown('###### 売れ筋展示品との距離/コサイン類似度')
+        st.write(df_knn)
+        st.caption('df_knn')
 
