@@ -11,7 +11,7 @@ from sklearn.neighbors import NearestNeighbors
 
 #st
 st.set_page_config(page_title='recommend_series')
-st.markdown('### レコメンド ユーザーBアプリ/専門店2')
+st.markdown('### 展示品分析＆新規展示レコメンド/専門店')
 
 #データ読み込み
 df_zenkoku = pd.read_pickle('df_zenkoku79v2.pickle')
@@ -47,7 +47,6 @@ if target_list != '':
         'target得意先:',
         target_list,   
     ) 
-st.image(img_yajirusi, width=20)  
 
 if target != '--得意先を選択--':
 
@@ -81,14 +80,14 @@ if target != '--得意先を選択--':
 
     st.image(img_yajirusi, width=20) 
 
-    st.markdown('####  ４．動きのよくない展示品の抽出')
+    st.markdown('####  ４．受注ファイルの読み込み')
 
     # ***ファイルアップロード 今期***
     uploaded_file_now = st.file_uploader('今期受注ファイル', type='xlsx', key='now')
 
     if uploaded_file_now:
         df_now = pd.read_excel(
-            uploaded_file_now, sheet_name='受注委託移動在庫生産照会', usecols=[3, 15, 42, 50])  # index　ナンバー不要　index_col=0
+            uploaded_file_now, sheet_name='受注委託移動在庫生産照会', usecols=[3, 15, 16, 42, 50])  # index　ナンバー不要　index_col=0
     else:
         st.info('今期のファイルを選択してください。')
         st.stop() 
@@ -192,42 +191,10 @@ if target != '--得意先を選択--':
         st.caption('df_calc') 
 
 
-    #展示品の売り上げ上限を入力
-    max_line = st.number_input('いくら以下を抽出するか', key='max_line', value=100000)
-    #展示品に絞込み
-    df_cold_sales = df_calc.loc[tenji_list]
-    #売上下限以下のdfを作成
-    df_cold_sales = df_cold_sales[df_cold_sales[f'{target}_now'] <= max_line]
-    df_cold_sales = df_cold_sales.sort_values(f'{target}_now', ascending=False)
-    
-    st.markdown('##### 動いていない展示品')
-    st.caption('df_cold_sales')
-    st.write(df_cold_sales) 
-    
-    # with st.expander('得意先別/シリーズLD別/売上表', expanded=False):
-    #     st.write(df_now_target2)
-    #     st.caption('df_now_target2')
-
     #sales行の削除
     df_calc.drop(index='sales', inplace=True)
     df_calc = df_calc.fillna(0)
-    # with st.expander('ターゲット得意先/シリーズ別売上/今期'):
-    #     st.write(df_now_target2)
-    #     st.caption('df_now_target2')
 
-    st.markdown('####  ５．売れ筋展示品の抽出')
-    #売れ筋の抽出
-    #売れ筋の売り上げ下限を入力
-    min_line = st.number_input('展示品の売上下限を入力', key='min_line', value=500000)
-
-    #売上下限以下のdfを作成
-    df_hot_sales = df_calc[df_calc[f'{target}_now'] >= min_line]
-
-    df_hot_sales = df_hot_sales.sort_values(f'{target}_now', ascending=False)
-    st.markdown('##### 売れ筋展示品')
-    st.caption('df_hot_sales')
-    st.table(df_hot_sales)
-    
     #最近傍探索の準備　targetの最新のデータとdf_zenkoku3tをmerge
     df_zenkoku3t = df_zenkoku3.T #index:商品/col:得意先
     df_zenkoku3t.drop(target, axis=1, inplace=True)
@@ -246,7 +213,9 @@ if target != '--得意先を選択--':
     #**************************************************最近傍探索
     #インスタンス化
     #似ている得意先上位何位まで抽出するか
-    st.markdown('#### ６．似ている得意先の上位何位まで抽出するか')
+    st.image(img_yajirusi, width=20) 
+    st.markdown('### ユーザーベース')
+    st.markdown('#### 5．似ている得意先の上位何位まで抽出するか')
     n_neighbors = st.number_input('抽出数', key='n_neighbors', value=5)
 
     neigh = NearestNeighbors(n_neighbors=n_neighbors, metric='cosine')
@@ -358,8 +327,7 @@ if target != '--得意先を選択--':
         st.write(df_merge_selected)
         st.caption('df_merge_selected')
 
-    st.markdown('# ユーザーベース')
-    st.write('展示品のリスト diff順')
+    #展示品のリスト diff順
     tenji_list2 = []
     for item in tenji_list:
         if item in list(df_merge_selected.index):
@@ -369,9 +337,11 @@ if target != '--得意先を選択--':
 
     df_tenji = df_merge_selected.loc[tenji_list2]
     df_tenji.sort_values('diff', inplace=True)
-    st.write(df_tenji)
+    with st.expander('展示品のリスト diff順'):
+        st.write(df_tenji)
+        st.caption('df_tenji')
 
-    st.write('非展示品のリスト diff順')
+    #非展示品のリスト 平均順
     nontenji_list = []
     for item in df_merge_selected.index:
         if item not in tenji_list:
@@ -379,7 +349,7 @@ if target != '--得意先を選択--':
 
 
     df_nontenji = df_merge_selected.loc[nontenji_list]
-    df_nontenji.sort_values('diff', inplace=True)
+    df_nontenji.sort_values('平均', ascending=False, inplace=True)
 
     #max minの追加
     df02 = df0.copy()
@@ -389,12 +359,16 @@ if target != '--得意先を選択--':
     df02 = df02[['max', 'min']]
     df_nontenjim = df_nontenji.merge(df02, left_index=True, right_index=True, how='left')
 
-    st.write(df_nontenjim)
+    with st.expander('非展示品のリスト diff順'):
+        st.write(df_nontenjim)
+        st.caption('df_nontenjim')
 
     #**********************************************************************アイテムベース
     #**************************************************最近傍探索
     #インスタンス化
     #似ている得意先上位何位まで抽出するか
+    st.image(img_yajirusi, width=20) 
+    st.markdown('### アイテムベース')
     st.markdown('#### 似ているアイテムの上位何位まで抽出するか')
     n_neighbors = st.number_input('抽出数', key='n_neighbors2', value=10)
 
@@ -410,10 +384,10 @@ if target != '--得意先を選択--':
     #ここで使うdfのindexがアイテムになる。itemベースとの違いはここだけ
 
     
-    def knn2():
+    def knn2(target_item):
         
         #指定した得意先に近い得意先を探索
-        df_target = df_zenkoku4t[df_zenkoku4t.index==f'{target}_now']
+        df_target = df_zenkoku4t[df_zenkoku4t.index==f'{target_item}']
         distance, indices = neigh.kneighbors(df_target ) #距離/indexナンバー
 
         #1次元リストに変換 np.flatten　元は2次元
@@ -427,25 +401,146 @@ if target != '--得意先を選択--':
             st.write(indices_f)
 
         #indexオブジェクトからlist化
-        index_list = list(df_zenkoku4.index)
+        index_list = list(df_zenkoku4t.index)
         #indicesのint化
         indices_f = [int(x) for x in indices_f]
 
         #df化
-        user_list = []
+        item_list = []
         for i in indices_f:
             index_name = index_list[i]
-            user_list.append(index_name)
+            item_list.append(index_name)
 
-        df_result = pd.DataFrame(distance_f, columns=[f'{target}_now'], index=user_list)
+        df_result = pd.DataFrame(distance_f, columns=[f'{target_item}'], index=item_list)
         
         return df_result
 
+    st.markdown('#### 売れている展示品の抽出')
+    #売れているアイテム
+    under_line = st.number_input('展示品の売上下限を入力', key='under_line', value=500000)
+
+    #売上下限以下のdfを作成
+    df_hot_sales = df_calc[df_calc[f'{target}_now'] >= under_line]
+
+    df_hot_sales = df_hot_sales.sort_values(f'{target}_now', ascending=False)
+    hot_item_list = list(df_hot_sales.index)
     #関数実行
-    df_knn = knn()
+    df_main = pd.DataFrame()
+    for item in hot_item_list:
+        df_knn = knn2(item)
+        df_main = df_main.merge(df_knn, left_index=True, right_index=True, how='outer')
 
     with st.expander('売れ筋展示品との距離', expanded=False):
         st.markdown('###### 売れ筋展示品との距離/コサイン類似度')
-        st.write(df_knn)
-        st.caption('df_knn')
+        st.write(df_main)
+        st.caption('df_main')
+
+    #個数列の追加
+    df_main['count'] = (df_main > 0).sum(axis=1)
+    df_main.sort_values('count', ascending=False, inplace=True)
+    #非展示品に絞る
+    nontenji_list2 = []
+    for item in df_main.index:
+        if item not in tenji_list:
+            nontenji_list2.append(item)
+    df_main = df_main.loc[nontenji_list2]
+    with st.expander('アイテムベース結果', expanded=False):
+        st.write(df_main)
+        st.caption('df_main')
+    #***************************************************************************結果
+    st.markdown('## 結果')
+    st.markdown('### 展示品の仕分け')
+
+    #***動いていない展示品
+    #展示品の売り上げ上限を入力
+    st.markdown('#### 動いていない展示品の抽出')
+    max_line = st.number_input('いくら以下を抽出するか', key='max_line', value=100000)
+    #展示品に絞込み
+    df_cold_sales = df_calc.loc[tenji_list]
+    #売上下限以下のdfを作成
+    df_cold_sales = df_cold_sales[df_cold_sales[f'{target}_now'] <= max_line]
+    df_cold_sales = df_cold_sales.sort_values(f'{target}_now', ascending=False)
+    
+    st.caption('df_cold_sales')
+    st.write(df_cold_sales) 
+
+    #***売れ筋の抽出
+    #売れ筋の売り上げ下限を入力
+    st.markdown('#### 売れ筋の展示品')
+    st.caption('df_hot_sales')
+    st.table(df_hot_sales)
+    
+    st.markdown('### 現展示品')
+    st.markdown('#### 売上UPの可能性 〇')
+    df_nobisiro = df_tenji[df_tenji['diff'] < -100000]
+
+    #***売上UPの可能性あり
+    #受注データの日数の年間での割合算出
+    diff_day = df_now['受注日'].max() - df_now['受注日'].min() #timedelta型
+    diff_day = diff_day.days #timedeltaをintに変換
+    #年換算比率
+    rate_year = diff_day / 365
+
+    #年間の数字に換算
+    df_nobisiro[f'{target}_now'] = df_nobisiro[f'{target}_now'] /rate_year
+    df_nobisiro['平均'] = df_nobisiro['平均'] /rate_year
+    df_nobisiro['diff'] = df_nobisiro['diff'] /rate_year
+
+    #int
+    df_nobisiro[f'{target}_now'] = df_nobisiro[f'{target}_now'].astype('int')
+    df_nobisiro['平均'] = df_nobisiro['平均'].astype('int')
+    df_nobisiro['diff'] = df_nobisiro['diff'].astype('int')
+
+    st.table(df_nobisiro)
+    st.caption('● 数字は今期受注データの期間から年間に換算した予測数字')
+    st.caption('● ユーザーベースから')
+
+    #***売上UPの可能性低
+    st.markdown('#### 売上UPの可能性 ▲')
+    df_nonnobisiro = df_tenji[df_tenji['diff'] > 0]
+
+    #年間の数字に換算
+    df_nonnobisiro[f'{target}_now'] = df_nonnobisiro[f'{target}_now'] /rate_year
+    df_nonnobisiro['平均'] = df_nonnobisiro['平均'] /rate_year
+    df_nonnobisiro['diff'] = df_nonnobisiro['diff'] /rate_year
+
+    #int
+    df_nonnobisiro[f'{target}_now'] = df_nonnobisiro[f'{target}_now'].astype('int')
+    df_nonnobisiro['平均'] = df_nonnobisiro['平均'].astype('int')
+    df_nonnobisiro['diff'] = df_nonnobisiro['diff'].astype('int')
+    st.table(df_nonnobisiro)
+    st.caption('● 数字は今期受注データの期間から年間に換算した予測数字')
+    st.caption('● ユーザーベースから')
+
+    #新展示レコメンド
+    st.markdown('### 新規展示レコメンド')
+    st.markdown('### TOP3')
+
+    #ユーザーベース
+    st.markdown('#### ユーザーベース')
+    #年間の数字に換算
+    df_nontenjim[f'{target}_now'] = df_nontenjim[f'{target}_now'] /rate_year
+    df_nontenjim['平均'] = df_nontenjim['平均'] /rate_year
+    df_nontenjim['diff'] = df_nontenjim['diff'] /rate_year
+
+    #int
+    df_nontenjim[f'{target}_now'] = df_nontenjim[f'{target}_now'].astype('int')
+    df_nontenjim['平均'] = df_nontenjim['平均'].astype('int')
+    df_nontenjim['diff'] = df_nontenjim['diff'].astype('int')
+
+    st.table(df_nontenjim.head(3))
+    st.caption('● 数字は今期受注データの期間から年間に換算した予測数字')
+    st.caption('● max/minは年間の類似得意先の売上から抽出')
+
+    #アイテムベース
+    st.markdown('#### アイテムベースベース')
+
+    st.table(df_main.head(3))
+    st.caption('● 横軸はtarget得意先で売れているアイテム/左から売れている順')
+    st.caption('● 数値はベクトルの距離/小さいほど近い')
+    st.caption('● countは売れているアイテムに近いアイテムの数/多いほど良い')
+
+
+
+      
 
