@@ -3,6 +3,8 @@ import pandas as pd
 import streamlit as st
 from PIL import Image
 import openpyxl
+import plotly.figure_factory as ff
+import plotly.graph_objects as go
 
 from scipy.sparse import csr_matrix
 from sklearn.neighbors import NearestNeighbors
@@ -27,8 +29,7 @@ df_zenkoku2 = df_zenkoku.copy().T
 df_zenkoku2 = df_zenkoku2[(df_zenkoku2['sales'] >= sales_min) & (df_zenkoku2['sales'] <= sales_max)]
 st.caption(f'対象得意先数: {len(df_zenkoku2)}')
 
-img_yajirusi = Image.open('矢印.jpeg')
-st.image(img_yajirusi, width=20)
+st.divider()
 
 #target選定用リスト
 st.markdown('####  ２．target得意先の選択')
@@ -67,6 +68,8 @@ if target != '--得意先を選択--':
         st.write(df_target_sales)
         st.caption('df_target_sales')
 
+    st.divider()    
+
     st.markdown('####  ３．展示品の選択')
 
     cate_list = list(df_target_sales.index)
@@ -77,8 +80,7 @@ if target != '--得意先を選択--':
         if st.checkbox(cate):
             tenji_list.append(cate)
 
-
-    st.image(img_yajirusi, width=20) 
+    st.divider()
 
     st.markdown('####  ４．受注ファイルの読み込み')
 
@@ -210,10 +212,11 @@ if target != '--得意先を選択--':
         st.write((df_zenkoku4 > 0).sum())
         st.caption('df_zenkoku4の0超えの値の数')
 
+    st.divider()
     #**************************************************最近傍探索
     #インスタンス化
     #似ている得意先上位何位まで抽出するか
-    st.image(img_yajirusi, width=20) 
+  
     st.markdown('### ユーザーベース')
     st.markdown('#### 5．似ている得意先の上位何位まで抽出するか')
     n_neighbors = st.number_input('抽出数', key='n_neighbors', value=5)
@@ -363,11 +366,13 @@ if target != '--得意先を選択--':
         st.write(df_nontenjim)
         st.caption('df_nontenjim')
 
+    st.divider()    
+
     #**********************************************************************アイテムベース
     #**************************************************最近傍探索
     #インスタンス化
     #似ている得意先上位何位まで抽出するか
-    st.image(img_yajirusi, width=20) 
+
     st.markdown('### アイテムベース')
     st.markdown('#### 似ているアイテムの上位何位まで抽出するか')
     n_neighbors = st.number_input('抽出数', key='n_neighbors2', value=10)
@@ -394,11 +399,11 @@ if target != '--得意先を選択--':
         distance_f = distance.flatten()
         indices_f = indices.flatten()
 
-        with st.expander('distance_t/indices_t'):
-            st.caption('distance_t')
-            st.write(distance_f)
-            st.caption('indices_t')
-            st.write(indices_f)
+        # with st.expander('distance_t/indices_t'):
+        #     st.caption('distance_t')
+        #     st.write(distance_f)
+        #     st.caption('indices_t')
+        #     st.write(indices_f)
 
         #indexオブジェクトからlist化
         index_list = list(df_zenkoku4t.index)
@@ -414,8 +419,50 @@ if target != '--得意先を選択--':
         df_result = pd.DataFrame(distance_f, columns=[f'{target_item}'], index=item_list)
         
         return df_result
+    
+    st.divider()
+    #***************************************************************************結果
 
-    st.markdown('#### 売れている展示品の抽出')
+    st.markdown('## 結果')
+    st.markdown('### 1.展示品の仕分け')
+
+    #***************動いていない展示品
+    #展示品の売り上げ上限を入力
+    st.markdown('#### 1-1.動いていない展示品の抽出')
+    max_line = st.number_input('いくら以下を抽出するか', key='max_line', value=100000)
+    #展示品に絞込み
+    df_cold_sales = df_calc.loc[tenji_list]
+    #売上下限以下のdfを作成
+    df_cold_sales = df_cold_sales[df_cold_sales[f'{target}_now'] <= max_line]
+    df_cold_sales = df_cold_sales.sort_values(f'{target}_now', ascending=False)
+    
+    with st.expander('動いていない展示品', expanded=False):
+        st.caption('df_cold_sales')
+        st.write(df_cold_sales)
+
+         #可視化
+    #グラフを描くときの土台となるオブジェクト
+    fig_cold = go.Figure()
+    #今期のグラフの追加
+    fig_cold.add_trace(
+        go.Bar(
+            x=df_cold_sales.index,
+            y=df_cold_sales[f'{target}_now'],
+            text=round(df_cold_sales[f'{target}_now']/10000),
+            textposition="outside", 
+            name='現在実績/今期')
+    )
+
+    #レイアウト設定     
+    fig_cold.update_layout(
+        title='動いていない展示品',
+        showlegend=True #凡例表示
+    )
+    #plotly_chart plotlyを使ってグラグ描画　グラフの幅が列の幅
+    st.plotly_chart(fig_cold, use_container_width=True) 
+
+    #****************売れ筋の売り上げ下限を入力
+    st.markdown('#### 1-2.売れ筋の展示品')
     #売れているアイテム
     under_line = st.number_input('展示品の売上下限を入力', key='under_line', value=500000)
 
@@ -447,33 +494,39 @@ if target != '--得意先を選択--':
     with st.expander('アイテムベース結果', expanded=False):
         st.write(df_main)
         st.caption('df_main')
-    #***************************************************************************結果
-    st.markdown('## 結果')
-    st.markdown('### 展示品の仕分け')
 
-    #***動いていない展示品
-    #展示品の売り上げ上限を入力
-    st.markdown('#### 動いていない展示品の抽出')
-    max_line = st.number_input('いくら以下を抽出するか', key='max_line', value=100000)
-    #展示品に絞込み
-    df_cold_sales = df_calc.loc[tenji_list]
-    #売上下限以下のdfを作成
-    df_cold_sales = df_cold_sales[df_cold_sales[f'{target}_now'] <= max_line]
-    df_cold_sales = df_cold_sales.sort_values(f'{target}_now', ascending=False)
+    with st.expander('売れている展示品', expanded=False):
+        st.caption('df_hot_sales')
+        st.table(df_hot_sales)    
+
+    #可視化
+    #グラフを描くときの土台となるオブジェクト
+    fig_hot = go.Figure()
+    #今期のグラフの追加
+    fig_hot.add_trace(
+        go.Bar(
+            x=df_hot_sales.index,
+            y=df_hot_sales[f'{target}_now'],
+            text=round(df_hot_sales[f'{target}_now']/10000),
+            textposition="outside", 
+            name='現在実績/今期')
+    )
+
+    #レイアウト設定     
+    fig_hot.update_layout(
+        title='売れている展示品',
+        showlegend=True #凡例表示
+    )
+    #plotly_chart plotlyを使ってグラグ描画　グラフの幅が列の幅
+    st.plotly_chart(fig_hot, use_container_width=True)     
+
+    st.divider()
+    #**************************売れ筋の抽出
     
-    st.caption('df_cold_sales')
-    st.write(df_cold_sales) 
-
-    #***売れ筋の抽出
-    #売れ筋の売り上げ下限を入力
-    st.markdown('#### 売れ筋の展示品')
-    st.caption('df_hot_sales')
-    st.table(df_hot_sales)
+    st.markdown('### 2.現展示品の売上UPの可能性')
+    st.markdown('#### 2-1.売上UPの可能性 〇')
+    df_nobisiro = df_tenji[df_tenji['diff'] < -100000]    
     
-    st.markdown('### 現展示品')
-    st.markdown('#### 売上UPの可能性 〇')
-    df_nobisiro = df_tenji[df_tenji['diff'] < -100000]
-
     #***売上UPの可能性あり
     #受注データの日数の年間での割合算出
     diff_day = df_now['受注日'].max() - df_now['受注日'].min() #timedelta型
@@ -491,12 +544,45 @@ if target != '--得意先を選択--':
     df_nobisiro['平均'] = df_nobisiro['平均'].astype('int')
     df_nobisiro['diff'] = df_nobisiro['diff'].astype('int')
 
-    st.table(df_nobisiro)
+    with st.expander('売上　現状予測/平均値', expanded=False):
+        st.table(df_nobisiro)
+        st.caption('df_nobisiro')
+    
+     #可視化
+    #グラフを描くときの土台となるオブジェクト
+    fig_nobishiro = go.Figure()
+    #今期のグラフの追加
+    fig_nobishiro.add_trace(
+        go.Bar(
+            x=df_nobisiro.index,
+            y=df_nobisiro[f'{target}_now'],
+            text=round(df_nobisiro[f'{target}_now']/10000),
+            textposition="outside", 
+            name='現状予測')
+    )
+    #前期のグラフの追加
+    fig_nobishiro.add_trace(
+        go.Bar(
+            x=df_nobisiro.index,
+            y=df_nobisiro['平均'],
+            text=round(df_nobisiro['平均']/10000),
+            textposition="outside", 
+            name='平均値/可能性'
+            )
+    )
+    #レイアウト設定     
+    fig_nobishiro.update_layout(
+        title='売上　現状予測/平均値/年間',
+        showlegend=True #凡例表示
+    )
+    #plotly_chart plotlyを使ってグラグ描画　グラフの幅が列の幅
+    st.plotly_chart(fig_nobishiro, use_container_width=True) 
     st.caption('● 数字は今期受注データの期間から年間に換算した予測数字')
     st.caption('● ユーザーベースから')
 
+
     #***売上UPの可能性低
-    st.markdown('#### 売上UPの可能性 ▲')
+    st.markdown('#### 2-2.売上UPの可能性 ▲')
     df_nonnobisiro = df_tenji[df_tenji['diff'] > 0]
 
     #年間の数字に換算
@@ -508,16 +594,51 @@ if target != '--得意先を選択--':
     df_nonnobisiro[f'{target}_now'] = df_nonnobisiro[f'{target}_now'].astype('int')
     df_nonnobisiro['平均'] = df_nonnobisiro['平均'].astype('int')
     df_nonnobisiro['diff'] = df_nonnobisiro['diff'].astype('int')
-    st.table(df_nonnobisiro)
+
+    with st.expander('売上　現状予測/平均値', expanded=False):
+        st.table(df_nonnobisiro)
+        st.caption('df_nonnobisiro')
+
+     #可視化
+    #グラフを描くときの土台となるオブジェクト
+    fig_nonnobishiro = go.Figure()
+    #今期のグラフの追加
+    fig_nonnobishiro.add_trace(
+        go.Bar(
+            x=df_nonnobisiro.index,
+            y=df_nonnobisiro[f'{target}_now'],
+            text=round(df_nonnobisiro[f'{target}_now']/10000),
+            textposition="outside", 
+            name='現状予測')
+    )
+    #前期のグラフの追加
+    fig_nonnobishiro.add_trace(
+        go.Bar(
+            x=df_nonnobisiro.index,
+            y=df_nonnobisiro['平均'],
+            text=round(df_nonnobisiro['平均']/10000),
+            textposition="outside", 
+            name='平均値/可能性'
+            )
+    )
+    #レイアウト設定     
+    fig_nonnobishiro.update_layout(
+        title='売上　現状予測/平均値/年間',
+        showlegend=True #凡例表示
+    )
+    #plotly_chart plotlyを使ってグラグ描画　グラフの幅が列の幅
+    st.plotly_chart(fig_nonnobishiro, use_container_width=True) 
     st.caption('● 数字は今期受注データの期間から年間に換算した予測数字')
     st.caption('● ユーザーベースから')
 
+    st.divider()
+
+    #**********************************************レコメンド
     #新展示レコメンド
-    st.markdown('### 新規展示レコメンド')
-    st.markdown('### TOP3')
+    st.markdown('### 3.新規展示レコメンド')
 
     #ユーザーベース
-    st.markdown('#### ユーザーベース')
+    st.markdown('#### 3-1.ユーザーベース')
     #年間の数字に換算
     df_nontenjim[f'{target}_now'] = df_nontenjim[f'{target}_now'] /rate_year
     df_nontenjim['平均'] = df_nontenjim['平均'] /rate_year
@@ -528,17 +649,75 @@ if target != '--得意先を選択--':
     df_nontenjim['平均'] = df_nontenjim['平均'].astype('int')
     df_nontenjim['diff'] = df_nontenjim['diff'].astype('int')
 
-    st.table(df_nontenjim.head(3))
-    st.caption('● 数字は今期受注データの期間から年間に換算した予測数字')
-    st.caption('● max/minは年間の類似得意先の売上から抽出')
+    with st.expander('展示品レコメンド', expanded=False):
+        st.table(df_nontenjim)
+        st.caption('● 数字は今期受注データの期間から年間に換算した予測数字')
+        st.caption('● max/minは年間の類似得意先の売上から抽出')
 
-    #アイテムベース
+      #可視化
+    #グラフを描くときの土台となるオブジェクト
+    fig_user = go.Figure()
+    #今期のグラフの追加
+    fig_user.add_trace(
+        go.Bar(
+            x=df_nontenjim.index,
+            y=df_nontenjim['平均'].head(),
+            text=round(df_nontenjim['平均'].head()/10000),
+            textposition="outside", 
+            name='平均値')
+    )
+    #前期のグラフの追加
+    fig_user.add_trace(
+        go.Bar(
+            x=df_nontenjim.index,
+            y=df_nontenjim['max'].head(),
+            text=round(df_nontenjim['max'].head()/10000),
+            textposition="outside", 
+            name='max/可能性'
+            )
+    )
+    #レイアウト設定     
+    fig_user.update_layout(
+        title='新規展示品レコメンド/予測年間',
+        showlegend=True #凡例表示
+    )
+    #plotly_chart plotlyを使ってグラグ描画　グラフの幅が列の幅
+    st.plotly_chart(fig_user, use_container_width=True) 
+
+    st.divider()
+
+    #****************************************アイテムベース
     st.markdown('#### アイテムベースベース')
 
-    st.table(df_main.head(3))
-    st.caption('● 横軸はtarget得意先で売れているアイテム/左から売れている順')
+    with st.expander('レコメンド展示品', expanded=False):
+        st.table(df_main)
+        st.caption('df_main')
+
+    #可視化
+    #グラフを描くときの土台となるオブジェクト
+    fig_item = go.Figure()
+    #今期のグラフの追加
+    for col in df_main.columns[:-1]:
+        fig_item.add_trace(
+            go.Bar(
+                x=df_main.index,
+                y=df_main[col].head(),
+                text=round(df_main[col].head(), 2),
+                textposition="outside", 
+                name=col)
+    )
+
+    #レイアウト設定     
+    fig_item.update_layout(
+        title='新規展示品レコメンド/売れ筋展示品との近さ',
+        showlegend=True #凡例表示
+    )
+    #plotly_chart plotlyを使ってグラグ描画　グラフの幅が列の幅
+    st.plotly_chart(fig_item, use_container_width=True) 
+    st.caption('● 左から推奨順')
+    st.caption('● グラフの本数が多いほど推奨度が高い')
     st.caption('● 数値はベクトルの距離/小さいほど近い')
-    st.caption('● countは売れているアイテムに近いアイテムの数/多いほど良い')
+    
 
 
 
