@@ -594,7 +594,7 @@ if target != '--得意先を選択--':
 
     #int
     df_nontenjim.drop('sales', axis=0, inplace=True)
-    st.write(df_nontenjim)
+   
     df_nontenjim[f'{target}_now'] = df_nontenjim[f'{target}_now'].fillna(0).astype('int')
     df_nontenjim['平均'] = df_nontenjim['平均'].astype('int')
     df_nontenjim['diff'] = df_nontenjim['diff'].astype('int')
