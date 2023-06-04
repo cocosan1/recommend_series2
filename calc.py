@@ -87,6 +87,126 @@ else:
 #*****************************************************graphインスタンス
 graph = Graph()
 
+#**********************************************************商品別概要
+def overview():
+    st.markdown('### アイテム概要把握/数量')
+
+    cate_list = ['リビングチェア', 'ダイニングチェア', 'ダイニングテーブル', 'リビングテーブル', 'キャビネット類']
+    selected_cate = st.selectbox(
+        '商品分類',
+        cate_list,
+        key='cl'
+    )
+    if selected_cate == 'リビングチェア':
+        df_now2 = df_now[(df_now['商　品　名'].str.contains('ｿﾌｧ1P')) | 
+                         (df_now['商　品　名'].str.contains('ｿﾌｧ2P')) |
+                         (df_now['商　品　名'].str.contains('ｿﾌｧ2.5P')) | 
+                         (df_now['商　品　名'].str.contains('ｿﾌｧ3P')) 
+                         ] 
+        
+        df_last2 = df_last[(df_last['商　品　名'].str.contains('ｿﾌｧ1P')) | 
+                           (df_last['商　品　名'].str.contains('ｿﾌｧ2P')) |
+                           (df_last['商　品　名'].str.contains('ｿﾌｧ2.5P')) | 
+                           (df_last['商　品　名'].str.contains('ｿﾌｧ3P')) 
+                           ] 
+            
+
+        df_now2['品番'] = df_now2['商　品　名'].apply(lambda x: x.split(' ')[0])
+        df_last2['品番'] = df_last2['商　品　名'].apply(lambda x: x.split(' ')[0])
+
+        df_now2['数量'] = df_now2['数量'].fillna(0)
+        df_last2['数量'] = df_last2['数量'].fillna(0)
+
+        s_now2g = df_now2.groupby('品番')['数量'].sum()
+        s_last2g = df_last2.groupby('品番')['数量'].sum()
+
+    else:
+        df_now2 = df_now[df_now['商品分類名2']==selected_cate]
+        df_last2 = df_last[df_last['商品分類名2']==selected_cate]
+
+        df_now2['品番'] = df_now2['商　品　名'].apply(lambda x: x.split(' ')[0])
+        df_last2['品番'] = df_last2['商　品　名'].apply(lambda x: x.split(' ')[0])
+
+        df_now2['数量'] = df_now2['数量'].fillna(0)
+        df_last2['数量'] = df_last2['数量'].fillna(0)
+
+
+        s_now2g = df_now2.groupby('品番')['数量'].sum()
+        s_last2g = df_last2.groupby('品番')['数量'].sum()
+    
+    st.write(f'【今期数量】{s_now2g.sum()} 【前期数量】{s_last2g.sum()} \
+             【対前年比】{s_now2g.sum() / s_last2g.sum():.2f}')
+
+    col1, col2 = st.columns(2)
+    with col1:
+        st.markdown('#### 今期 Top30')
+        #上位30取り出し
+        s_temp_now = s_now2g.sort_values(ascending=False)
+        s_temp_now = s_temp_now[0:30]
+        #並べ替え
+        s_temp_now.sort_values(ascending=True, inplace=True)
+        graph.make_bar_h_nonline(s_temp_now, s_temp_now.index, '今期', '今期/数量', 700)
+        
+        with st.expander('一覧', expanded=False):
+            st.dataframe(s_now2g)
+
+        #外れ値処理
+        st.markdown('##### 外れ値処理')
+        under_now = st.number_input('下限指定', key='unn', value=0)
+        upper_now = st.number_input('上限指定', key='upn', value=100)
+
+        s_now2g = s_now2g[(s_now2g >= under_now) & (s_now2g <= upper_now)]
+
+        with st.expander('外れ値処理後', expanded=False):
+            st.write(s_now2g)
+
+    with col2:
+        st.markdown('#### 前期 Top30')
+        #上位30取り出し
+        s_temp_last = s_last2g.sort_values(ascending=False)
+        s_temp_last = s_temp_last[0:30]
+        #並べ替え
+        s_temp_last.sort_values(ascending=True, inplace=True)
+        graph.make_bar_h_nonline(s_temp_last, s_temp_last.index, '前期', '前期/数量', 700)
+        
+        with st.expander('一覧', expanded=False):
+            st.dataframe(s_last2g) 
+
+        #外れ値処理
+        st.markdown('##### 外れ値処理')
+        under_last = st.number_input('下限指定', key='unl', value=0)
+        upper_last = st.number_input('上限指定', key='upl', value=100)
+
+        s_last2g = s_last2g[(s_last2g >= under_last) & (s_last2g <= upper_last)]
+        with st.expander('外れ値処理後', expanded=False):
+            st.write(s_last2g)
+    
+    st.write(df_now2)
+
+    st.markdown('#### 品番検索')
+
+    #品番検索
+    part_word = st.text_input(
+        '頭品番 例SN',
+        key='pw'
+    )
+
+    if part_word != '':
+
+        item_list = []
+        for item in df_now2['品番'].unique():
+            if part_word in item:
+                item_list.append(item)
+
+        selected_item = st.selectbox(
+            '品番',
+            item_list,
+            key='sl'
+        )
+        df_select = df_now2[df_now2['品番'] == selected_item]
+    
+
+
 #*****************************************************アイテム数量偏差値分析
 def cnt_deviation():
     #*******************************************上昇下降アイテムの抽出
@@ -640,6 +760,7 @@ def main():
     # アプリケーション名と対応する関数のマッピング
     apps = {
         '-': None,
+        'アイテム別概要': overview,
         '上昇・下降アイテム分析/数量': cnt_deviation,
         '上昇・下降アイテム分析/金額': sales_deviation,
         '平均回転数/店舗': meancnt_per_cust,
