@@ -181,7 +181,7 @@ def overview():
         with st.expander('外れ値処理後', expanded=False):
             st.write(s_last2g)
     
-    st.write(df_now2)
+    
 
     st.markdown('#### 品番検索')
 
@@ -203,7 +203,34 @@ def overview():
             item_list,
             key='sl'
         )
-        df_select = df_now2[df_now2['品番'] == selected_item]
+        df_now3 = df_now2[df_now2['品番'] == selected_item]
+        df_last3 = df_last2[df_last2['品番'] == selected_item]
+
+        s_now = df_now3.groupby('得意先名')['数量'].sum()
+        s_last = df_last3.groupby('得意先名')['数量'].sum()
+
+        s_now = s_now.sort_values()
+        s_last = s_last.sort_values()
+
+        now_cnts = []
+        for cnt in s_now.unique():
+            len_cnt = len(s_now[s_now==cnt])
+            now_cnts.append(len_cnt)
+        
+        last_cnts = []
+        for cnt in s_last.unique():
+            len_cnt = len(s_last[s_last==cnt])
+            last_cnts.append(len_cnt)
+
+        st.markdown('##### 数量の分布/箱ひけ')
+        df_nowcnts = pd.DataFrame(now_cnts)
+        val_median = df_nowcnts.median().iat[0]
+        val_075 = df_nowcnts.quantile(0.75).iat[0]
+        st.write(val_median)
+        st.write(val_075)
+        graph.make_box(now_cnts, last_cnts, ['今期', '前期'])
+
+        
     
 
 

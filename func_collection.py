@@ -508,6 +508,22 @@ class Graph():
             st.plotly_chart(fig, use_container_width=True) 
             #plotly_chart plotlyを使ってグラグ描画　グラフの幅が列の幅
 
+        #***************************************************************箱ひげ
+        def make_box(self, list_now, list_last, name_list):
+            fig = go.Figure()
+            fig.add_trace(go.Box(y=list_now,
+                                name=name_list[0]))
+            fig.add_trace(go.Box(y=list_last,
+                                name=name_list[1]))
+            fig.update_traces(boxpoints='all', jitter=0.3) 
+            #散布図　jitter=0.3として散布図の幅(広がり方)を指定
+            st.plotly_chart(fig, use_container_width=True) 
+            #plotly_chart plotlyを使ってグラグ描画　グラフの幅が列の幅
+
+
+
+
+
 #*******************************************アイテムの深堀
 #******************データの絞込み
 def fukabori(df_now, df_now2, graph):
