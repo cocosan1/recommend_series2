@@ -223,11 +223,11 @@ def overview():
             last_cnts.append(len_cnt)
 
         st.markdown('##### 数量の分布/箱ひけ')
-        df_nowcnts = pd.DataFrame(now_cnts)
-        val_median = df_nowcnts.median().iat[0]
-        val_075 = df_nowcnts.quantile(0.75).iat[0]
-        st.write(val_median)
-        st.write(val_075)
+        # df_nowcnts = pd.DataFrame(now_cnts)
+        # val_median = df_nowcnts.median().iat[0]
+        # val_075 = df_nowcnts.quantile(0.75).iat[0]
+        # st.write(val_median)
+        # st.write(val_075)
         graph.make_box(now_cnts, last_cnts, ['今期', '前期'])
 
         
