@@ -12,8 +12,8 @@ from sklearn.preprocessing import StandardScaler
 import func_collection as fc
 from func_collection import Graph
 
-st.set_page_config(page_title='ranking')
-st.markdown('## 品番別分析')
+st.set_page_config(page_title='分析2')
+st.markdown('## 分析2')
 
 #*******************************************************************************データ取り込み＋加工
 @st.cache_data(ttl=datetime.timedelta(hours=1))
@@ -96,7 +96,6 @@ def overview():
         ['数量', '金額'],
         key='ov_sbase'
     )
-
 
     cate_list = ['リビングチェア', 'ダイニングチェア', 'ダイニングテーブル', 'リビングテーブル', 'キャビネット類']
     selected_cate = st.selectbox(
@@ -195,10 +194,10 @@ def overview():
     df_calc = pd.DataFrame(list(zip(cnts, medis, quan75s, quan90s,maxs)), \
                     columns=['得意先数', '中央値', '第3四分位', '上位10%', '最大値'], index=items)
     
-    st.markdown('#### 数量の分布状況/アイテムベース')
+    st.markdown('#### 分布状況/アイテムベース')
     st.dataframe(df_calc)
     
-    #####################################1000万円想定一覧
+    #####################################年間想定一覧
     data_span =  (df_now['受注日'].max() - df_now['受注日'].min()).days
     #days属性を使用してTimedeltaオブジェクトの日数を取得
     span_rate = 365 / data_span
@@ -220,7 +219,7 @@ def overview():
 
     df_pred = pd.DataFrame(list(zip(mids, top10s, top1s)), columns=['中央値', '上位10%', '最大値'], \
                             index=items2)
-    st.markdown('#### 年間販売予測/年間売上1000万想定')
+    st.markdown('#### 年間販売予測')
     st.dataframe(df_pred)
 
     ############################################################品番絞込み
@@ -261,7 +260,7 @@ def overview():
 
         #試算
         
-        st.markdown('##### 販売予測/年間売上1000万想定')
+        st.markdown('##### 年間販売予測')
         df_pred2 = df_pred[df_pred.index == selected_item]
         st.write(f'■ 中央値: {round(s_now.median()*span_rate)}')
         st.write(f'■ 上位90%: {round(s_now.quantile(0.9)*span_rate)}')
@@ -290,13 +289,19 @@ def cnt_per_cust():
         key='cl'
     )
 
+    assumption = st.number_input(
+        '想定年間売上',
+        value=10000000,
+        key='assumption'
+    )
+
     #スケール調整用の比率算出
     #今期
     cust_dict_now = {}
 
     for cust in df_now['得意先名'].unique():
         sum_cust = df_now[df_now['得意先名']==cust]['金額'].sum()
-        scale_rate = 10000000 / sum_cust
+        scale_rate = assumption / sum_cust
         cust_dict_now[cust] = scale_rate
     
     df_scale = pd.DataFrame(cust_dict_now, index= ['scale_rate']).T
@@ -333,6 +338,196 @@ def cnt_per_cust():
 
     fc.fukabori(df_now, df_now2, graph)
 
+###########################################################################################展示分析
+def tenji():
+    st.markdown('### 展示分析')
+    st.write('★ 更新は submiit ボタンで!')
+
+    df_base = pd.read_excel(
+        uploaded_file_now, sheet_name='受注委託移動在庫生産照会', usecols=[1, 3, 15, 16, 42, 50])  # index　ナンバー不要　index_col=0
+
+    #index:item/col:cust
+    df_zenkoku = fc.make_data_cust(df_base)
+
+    with st.expander('df_zenkoku'):
+        st.write(df_zenkoku)
+    
+    ########################得意先の選択
+    st.markdown('####  得意先の選択')
+    cust_text = st.text_input('得意先名の一部を入力 例）ケンポ')
+
+    cust_list = []
+    for cust_name in df_zenkoku.columns:
+        if cust_text in cust_name:
+            cust_list.append(cust_name)
+
+    cust_list.insert(0, '--得意先を選択--')        
+
+    cust_name = ''
+    if cust_list != '':
+        # selectbox target ***
+        cust_name = st.selectbox(
+            '得意先:',
+            cust_list,   
+        ) 
+
+    #######################################展示品の分析
+    st.markdown('#### 展示品の分析')
+    cate_list = ['リビングチェア', 'ダイニングチェア', 'ダイニングテーブル', 'リビングテーブル', 'キャビネット類']
+    selected_cate = st.selectbox(
+        '商品分類',
+        cate_list,
+        key='tenji_cl'
+    )
+    if selected_cate == 'リビングチェア':
+        df_now2 = df_now[(df_now['商　品　名'].str.contains('ｿﾌｧ1P')) | 
+                         (df_now['商　品　名'].str.contains('ｿﾌｧ2P')) |
+                         (df_now['商　品　名'].str.contains('ｿﾌｧ2.5P')) | 
+                         (df_now['商　品　名'].str.contains('ｿﾌｧ3P')) 
+                         ] 
+        
+        df_last2 = df_last[(df_last['商　品　名'].str.contains('ｿﾌｧ1P')) | 
+                           (df_last['商　品　名'].str.contains('ｿﾌｧ2P')) |
+                           (df_last['商　品　名'].str.contains('ｿﾌｧ2.5P')) | 
+                           (df_last['商　品　名'].str.contains('ｿﾌｧ3P')) 
+                           ] 
+            
+
+        df_now2['品番'] = df_now2['商　品　名'].apply(lambda x: x.split(' ')[0])
+        df_last2['品番'] = df_last2['商　品　名'].apply(lambda x: x.split(' ')[0])
+
+        df_now2['金額'] = df_now2['金額'].fillna(0)
+        df_last2['金額'] = df_last2['金額'].fillna(0)
+
+        s_now2g = df_now2.groupby('品番')['金額'].sum()
+        s_last2g = df_last2.groupby('品番')['金額'].sum()
+
+    else:
+        df_now2 = df_now[df_now['商品分類名2']==selected_cate]
+        df_last2 = df_last[df_last['商品分類名2']==selected_cate]
+
+        df_now2['品番'] = df_now2['商　品　名'].apply(lambda x: x.split(' ')[0])
+        df_last2['品番'] = df_last2['商　品　名'].apply(lambda x: x.split(' ')[0])
+
+        df_now2['金額'] = df_now2['金額'].fillna(0)
+        df_last2['金額'] = df_last2['金額'].fillna(0)
+
+    ###############################データスケール調整
+     #数量データ分布一覧/itemベース
+
+    #想定売上設定
+    assumption = st.number_input(
+        '想定年間売上',
+        value=10000000,
+        key='assumption'
+    )
+
+    items = []
+
+    df_base = pd.DataFrame(index=df_now2['得意先名'].unique())
+    for item in df_now2['品番'].unique():
+        items.append(item)
+        df_item = df_now2[df_now2['品番']==item]
+        s_cust = df_item.groupby('得意先名')['金額'].sum()
+        df = pd.DataFrame(s_cust)
+        df.rename(columns={'金額': item}, inplace=True)
+        df_base = df_base.merge(df, left_index=True, right_index=True, how='left')
+    
+    df_base = df_base.fillna(0)
+    with st.expander('df_base', expanded=False):
+        st.dataframe(df_base)
+
+    #スケール調整用の比率算出
+    cust_dict = {}
+    #計算用に転置
+    df_baset = df_base.T
+    df_scale = pd.DataFrame()
+    for cust in df_baset.columns:
+        sum_cust = df_baset[cust].sum()
+        scale_rate = assumption / sum_cust
+        df_scale[cust] = round(df_baset[cust] * scale_rate)
+    
+    with st.expander('df_scale', expanded=False):
+        st.dataframe(df_scale)
+    
+    #転置 index得意先/col品番
+    df_scalet = df_scale.T
+    df_scalet.fillna(0, inplace=True)
+
+
+    #偏差値化
+    df_deviation = pd.DataFrame(index=df_scalet.index)
+    for item in df_scalet.columns:
+        df = df_scalet[item]
+        #販売した得意先だけで集計する
+        df = df[df > 0]
+        #標準偏差 母分散・母標準偏差ddof=0
+        df_std = df.std(ddof=0)
+        #平均値
+        df_mean = df.mean()
+        #偏差値
+        df_deviation[item] = ((df_scalet[item] - df_mean) / df_std * 10 + 50)
+        df_deviation.replace([np.inf, -np.inf, np.nan], 0, inplace=True)
+        df_deviation = df_deviation.round(1)
+    
+    #得意先に絞ったseries
+    s_cust_std = df_deviation.loc[cust_name]
+
+    with st.expander('df_cust_std', expanded=False):
+        st.dataframe(s_cust_std)
+    
+    #得意先の売上が0のitem行を削除
+    df_non0 = df_scale[df_scale[cust_name] != 0]
+    non0s = df_non0.index
+
+    s_cust_std = s_cust_std.loc[non0s]
+
+    s_cust_std.sort_values(ascending=False, inplace=True)
+    #可視化
+    st.markdown('##### 販売商品/偏差値')
+    graph.make_bar(s_cust_std, s_cust_std.index)
+
+    st.write('売上合計偏差値')
+    #index得意先col売上のseries
+    zenkoku_dict = {}
+    for cust in df_zenkoku.columns:
+        cust_sum = df_zenkoku[cust].sum()
+        zenkoku_dict[cust] = cust_sum
+
+    df_sales = pd.DataFrame(zenkoku_dict, index=['売上']).T
+
+    #偏差値化
+    df_deviation2 = pd.DataFrame(index=df_sales.index)
+
+    #標準偏差 母分散・母標準偏差ddof=0
+    s_std2 = df_sales.std(ddof=0)
+
+    #平均値
+    s_mean2 = df_sales.mean()
+
+    #偏差値
+    df_deviation2['偏差値'] = ((df_sales - s_mean2) / s_std2 * 10 + 50)
+    df_deviation2.replace([np.inf, -np.inf, np.nan], 0, inplace=True)
+    df_deviation2 = df_deviation2.round(1)
+    df_sales.sort_values('売上', ascending=False, inplace=True)
+    df_deviation2.sort_values('偏差値', ascending=False, inplace=True)
+
+    with st.expander('s_sales', expanded=False):
+        st.write(df_sales)
+    with st.expander('s_deviation2', expanded=False):
+        st.write(df_deviation2)
+    
+    cust_dev = df_deviation2.loc[cust_name]
+    st.write('■ 偏差値: 売上/全国')
+    st.write(cust_dev)
+    
+
+ 
+
+    
+
+
+
 
 #*****************************************************メイン
 def main():
@@ -341,6 +536,7 @@ def main():
         '-': None,
         'アイテム別概要': overview,
         '回転数/アイテム+店舗':cnt_per_cust,
+        '展示分析': tenji
           
     }
     selected_app_name = st.sidebar.selectbox(label='分析項目の選択',
