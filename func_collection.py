@@ -522,8 +522,6 @@ class Graph():
 
 
 
-
-
 #*******************************************アイテムの深堀
 #******************データの絞込み
 def fukabori(df_now, df_now2, graph):
@@ -545,7 +543,7 @@ def fukabori(df_now, df_now2, graph):
         selected_item = st.selectbox(
             '品番',
             item_list,
-            key='sl'
+            key='fukabori_sl'
         )
         df_select = df_now2[df_now2['品番'] == selected_item]
 
