@@ -369,7 +369,12 @@ def tenji():
         cust_name = st.selectbox(
             '得意先:',
             cust_list,   
-        ) 
+        )
+    
+    if cust_name == '':
+        st.info('得意先を選択してください')
+        st.stop()
+
 
     #######################################展示品の分析
     st.markdown('#### 展示品の分析')
