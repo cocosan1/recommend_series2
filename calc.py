@@ -525,6 +525,11 @@ def tenji():
     cust_dev = df_deviation2.loc[cust_name]
     st.write('■ 偏差値: 売上/全国')
     st.write(cust_dev)
+
+    #全国順位
+    st.write('■ 順位/全国')
+    st.write(f'全国得意先数: {len(df_sales)}')
+    st.write(f'順位: {df_sales.index.get_loc(cust_name)}')
     
 
  
