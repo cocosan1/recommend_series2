@@ -202,6 +202,10 @@ def overview():
     #days属性を使用してTimedeltaオブジェクトの日数を取得
     span_rate = 365 / data_span
 
+    test = df_calc[df_calc.index== 'TW101WL']
+    test2 = int(test.iat[0, 1])
+    st.write(test2)
+
     items2 = []
     mids = []
     top10s = []
@@ -209,9 +213,9 @@ def overview():
     for item in df_calc.index:
         items2.append(item)
         df = df_calc[df_calc.index == item]
-        mid = round(df['中央値'] * span_rate, 1).values
-        top10 = round(df['上位10%'] * span_rate, 1).values
-        top1 = round(df['最大値'] * span_rate, 1).values
+        mid = round(int(df.iat[0, 1]) * span_rate, 1)
+        top10 = round(int(df.iat[0, 3]) * span_rate, 1)
+        top1 = round(int(df.iat[0, 4]) * span_rate, 1)
 
         mids.append(mid)
         top10s.append(top10)
@@ -529,7 +533,7 @@ def tenji():
     #全国順位
     st.write('■ 順位/全国')
     st.write(f'全国得意先数: {len(df_sales)}')
-    st.write(f'順位: {df_sales.index.get_loc(cust_name)}')
+    st.write(f'順位: {df_sales.index.get_loc(cust_name) + 1}')
     
 
  
