@@ -202,10 +202,6 @@ def overview():
     #days属性を使用してTimedeltaオブジェクトの日数を取得
     span_rate = 365 / data_span
 
-    test = df_calc[df_calc.index== 'TW101WL']
-    test2 = int(test.iat[0, 1])
-    st.write(test2)
-
     items2 = []
     mids = []
     top10s = []
