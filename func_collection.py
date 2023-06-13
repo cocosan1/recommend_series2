@@ -508,13 +508,23 @@ class Graph():
             st.plotly_chart(fig, use_container_width=True) 
             #plotly_chart plotlyを使ってグラグ描画　グラフの幅が列の幅
 
-        #***************************************************************箱ひげ
+        #***************************************************************箱ひげ/今期前期
         def make_box(self, list_now, list_last, name_list):
             fig = go.Figure()
             fig.add_trace(go.Box(y=list_now,
                                 name=name_list[0]))
             fig.add_trace(go.Box(y=list_last,
                                 name=name_list[1]))
+            fig.update_traces(boxpoints='all', jitter=0.3) 
+            #散布図　jitter=0.3として散布図の幅(広がり方)を指定
+            st.plotly_chart(fig, use_container_width=True) 
+            #plotly_chart plotlyを使ってグラグ描画　グラフの幅が列の幅
+        
+        #***************************************************************箱ひげ/今期のみ
+        def make_box_now(self, list_now, name):
+            fig = go.Figure()
+            fig.add_trace(go.Box(y=list_now,
+                                name=name))
             fig.update_traces(boxpoints='all', jitter=0.3) 
             #散布図　jitter=0.3として散布図の幅(広がり方)を指定
             st.plotly_chart(fig, use_container_width=True) 
@@ -576,14 +586,13 @@ def fukabori(df_now, df_now2, graph):
         s_item = s_item.sort_values(ascending=True)
 
         with st.expander('売れ筋組み合わせ 塗色／張地', expanded=False):
-            graph.make_bar_h_nonline(s_item, s_item.index, '数量', '売れ筋組み合わせ 塗色／張地', 800)
+            graph.make_bar_h_nonline(s_item[-20:], s_item.index[-20:], '数量', '売れ筋組み合わせ 塗色／張地', 800)
 
-            st.dataframe(s_item)
         #********************購入している得意先
         s_sum = df_select.groupby('得意先名')['数量'].sum()
 
         s_sum = s_sum.sort_values(ascending=True)
-        graph.make_bar_h_nonline(s_sum, s_sum.index, '数量', '得意先別数量', 800)
+        graph.make_bar_h_nonline(s_sum[-20:], s_sum.index[-20:], '数量', '得意先別数量', 800)
 
         #dataframe作成
         sales_list = []
@@ -635,3 +644,128 @@ def fukabori(df_now, df_now2, graph):
 
         link = '[アソシエーション分析](https://cocosan1-association-fullhinban-cmy4cf.streamlit.app/)'
         st.markdown(link, unsafe_allow_html=True)
+
+#*******************************************アイテムの深堀　品番渡し
+#******************データの絞込み
+def fukabori2(hinban, df_now, df_now2, graph):
+    st.markdown('#### 品番検索: 売れ筋分析 塗色/張地/得意先')
+
+    df_select = df_now2[df_now2['品番'] == hinban]
+
+    #******************塗色分析
+    st.markdown('##### 塗色別数量')
+    s_color = df_select.groupby('塗色CD')['数量'].sum()
+
+    s_color = s_color.sort_values(ascending=False)
+    graph.make_bar(s_color, s_color.index)
+
+    #*****************張地ランキング
+    st.markdown('##### 張地別数量')
+    selected_color = st.selectbox(
+        '塗色を選択',
+        s_color.index,
+        key='sc'
+    )
+
+    df_color = df_select[df_select['塗色CD']==selected_color]
+    s_fab = df_color.groupby('張地')['数量'].sum()
+
+    s_fab = s_fab.sort_values(ascending=True)
+
+    with st.expander('張地グラフ', expanded=False):
+        graph.make_bar_h_nonline(s_fab, s_fab.index, '数量', '張地/数量順', 800)
+
+    #******************塗色張地分析
+    s_item = df_select.groupby('商　品　名')['数量'].sum()
+
+    s_item = s_item.sort_values(ascending=True)
+
+    with st.expander('売れ筋組み合わせ 塗色／張地', expanded=False):
+        graph.make_bar_h_nonline(s_item[-20:], s_item.index[-20:], '数量', '売れ筋組み合わせ 塗色／張地', 800)
+
+    #********************購入している得意先
+    s_sum = df_select.groupby('得意先名')['数量'].sum()
+
+    s_sum = s_sum.sort_values(ascending=True)
+    graph.make_bar_h_nonline(s_sum[-20:], s_sum.index[-20:], '数量', '得意先別数量', 800)
+
+    #dataframe作成
+    sales_list = []
+    rep_list = []
+    for cust in s_sum.index:
+        #得意先の売上取得
+        df_cust = df_now[df_now['得意先名'] == cust]
+        sales_sum = df_cust['金額'].sum()
+        sales_list.append(sales_sum)
+        #得意先担当者名取得
+        rep = df_cust.iloc[0]['営業担当者名']
+        rep_list.append(rep)
+
+    df_cust = pd.DataFrame(list(zip(s_sum, sales_list, rep_list)), index=s_sum.index, \
+                    columns=['数量', '参考:売上/全商品合計', '担当者'])
+    df_cust.sort_values('数量', ascending=False, inplace=True)
+
+    with st.expander('一覧', expanded=False):
+        st.dataframe(df_cust)
+    
+    #********************得意先別深堀
+    st.markdown('##### 得意先を選択して明細を見る')
+    selected_cust = st.selectbox(
+        '得意先を選択',
+        df_cust.index,
+        key='scust')
+    
+    df_cust2 = df_select[df_select['得意先名']==selected_cust]
+    s_cust = df_cust2.groupby('商　品　名')['数量'].sum()
+
+    s_cust = s_cust.sort_values(ascending=True)
+
+    with st.expander('選択した得意先の明細を見る: 組み合わせ 塗色／張地', expanded=False):
+        graph.make_bar_h_nonline(s_cust, s_cust.index, '数量', '組み合わせ 塗色／張地', 500)
+        st.dataframe(df_cust2)
+
+    
+    #アソシエーション分析へのリンク
+    st.markdown('#### 同時に買われているアイテムを見る')
+    df_concat = pd.DataFrame()
+    for num in df_cust2['伝票番号2']:
+        df = df_now[df_now['伝票番号2'] == num]
+        df_concat = pd.concat([df_concat, df], join='outer')
+    
+    with st.expander('明細', expanded=False):
+        col_list = ['得意先名', '商　品　名', '数量', '伝票番号2']
+        st.table(df_concat[col_list])
+
+
+    link = '[アソシエーション分析](https://cocosan1-association-fullhinban-cmy4cf.streamlit.app/)'
+    st.markdown(link, unsafe_allow_html=True)
+
+#************************************************************相関
+#index商品分類/col得意先/val売上
+@st.cache_data(ttl=datetime.timedelta(hours=1))
+def make_data_corr(df):
+
+    #必要なカラムだけに絞る
+    df = df[['得意先名', '金額', '商品コード2']]
+
+    #得意先毎に集計
+    custs = df['得意先名'].unique()
+    items = df['商品コード2'].unique()
+    df_calc = pd.DataFrame(index=items)
+    for cust in custs:
+        vals= []
+        df_cust = df[df['得意先名']==cust]
+        for item in items:
+            df_cust2 = df_cust[df_cust['商品コード2']==item]
+            if len(df_cust2) == 0:
+                vals.append(0)
+            else:
+                val = df_cust2['金額'].sum()
+                vals.append(val)
+        df_temp = pd.DataFrame(vals, columns=[cust], index=items)
+        df_calc = df_calc.merge(df_temp, left_index=True, right_index=True, how='outer') 
+
+    df_calc.loc['sales'] = df_calc.sum()
+    df_calc = df_calc.T
+    
+    return df_calc

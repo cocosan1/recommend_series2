@@ -172,102 +172,95 @@ def overview():
     #数量データ分布一覧/itemベース
     items = []
     cnts = []
+    quan25s = []
     medis = []
     quan75s = []
     quan90s = []
     maxs = []
+    span2575s = []
+    den_cnts = []
     for item in df_now2['品番'].unique():
         items.append(item)
         df_item = df_now2[df_now2['品番']==item]
         s_cust = df_item.groupby('得意先名')[selected_base].sum()
+        
         cnt = s_cust.count()
+        quan25 = round(s_cust.quantile(0.25), 1)
         medi = s_cust.median()
         quan75 = round(s_cust.quantile(0.75), 1)
         quan90 = round(s_cust.quantile(0.9), 1)
         max_num = s_cust.max()
+        span2575 = quan75 - quan25
+        den_cnt = df_item['伝票番号2'].nunique()
 
         cnts.append(cnt)
+        quan25s.append(quan25)
         medis.append(medi)
         quan75s.append(quan75)
         quan90s.append(quan90)
         maxs.append(max_num)
-    df_calc = pd.DataFrame(list(zip(cnts, medis, quan75s, quan90s,maxs)), \
-                    columns=['得意先数', '中央値', '第3四分位', '上位10%', '最大値'], index=items)
+        span2575s.append(span2575)
+        den_cnts.append(den_cnt)
+
+    df_calc = pd.DataFrame(list(zip(cnts, quan25s, medis, quan75s, quan90s, maxs, span2575s, den_cnts)), \
+                    columns=['得意先数', '第2四分位', '中央値', '第3四分位', '上位10%', '最大値', 'span2575', \
+                             '伝票数'], index=items)
     
     st.markdown('#### 分布状況/アイテムベース')
     st.dataframe(df_calc)
+
+    st.markdown('##### 下限ライン')
+    line_cust = st.number_input('得意先数', value=0, key='line_cust')
+    line_25 = st.number_input('第2四分位', value=0, key='line_25')
+    line_medi = st.number_input('中央値', value=0, key='line_medi')
+    line_75 = st.number_input('第3四分位', value=0, key='line_75')
+    line_90 = st.number_input('上位10%', value=0, key='line_90')
+    line_max = st.number_input('最大値', value=0, key='line_max')
+    line_span = st.number_input('span2575', value=0, key='line_span')
+
+    df_calc2 = df_calc[df_calc['得意先数'] >= line_cust]
+    df_calc2 = df_calc2[df_calc2['第2四分位'] >= line_25]
+    df_calc2 = df_calc2[df_calc2['中央値'] >= line_medi]
+    df_calc2 = df_calc2[df_calc2['第3四分位'] >= line_75]
+    df_calc2 = df_calc2[df_calc2['上位10%'] >= line_90]
+    df_calc2 = df_calc2[df_calc2['最大値'] >= line_max]
+    df_calc2 = df_calc2[df_calc2['span2575'] >= line_span]
+
+    st.dataframe(df_calc2)
+
+    st.markdown('##### 箱ひげ図を見る')
+    hinbans = sorted(list(df_calc2.index))
+    hinban = st.selectbox(
+        '品番の選択',
+        hinbans,
+        key= 'box'
+    )
+
+    df_hinban_now = df_now2[df_now2['品番']==hinban]
+    df_hinban_last = df_last2[df_last2['品番']==hinban]
+    s_cust_now = df_hinban_now.groupby('得意先名')[selected_base].sum()
+    s_cust_last = df_hinban_last.groupby('得意先名')[selected_base].sum()
     
-    #####################################年間想定一覧
+
+    #可視化
+    st.markdown('##### 数量の分布/箱ひげ')
+    st.write('得意先数')
+    st.write(len(s_cust_now))
+    graph.make_box(s_cust_now, s_cust_last,  ['今期', '前期'])
+
+    #試算
+    
+    st.markdown('##### 年間販売予測')
+
     data_span =  (df_now['受注日'].max() - df_now['受注日'].min()).days
     #days属性を使用してTimedeltaオブジェクトの日数を取得
     span_rate = 365 / data_span
-
-    items2 = []
-    mids = []
-    top10s = []
-    top1s = []
-    for item in df_calc.index:
-        items2.append(item)
-        df = df_calc[df_calc.index == item]
-        mid = round(int(df.iat[0, 1]) * span_rate, 1)
-        top10 = round(int(df.iat[0, 3]) * span_rate, 1)
-        top1 = round(int(df.iat[0, 4]) * span_rate, 1)
-
-        mids.append(mid)
-        top10s.append(top10)
-        top1s.append(top1)
-
-    df_pred = pd.DataFrame(list(zip(mids, top10s, top1s)), columns=['中央値', '上位10%', '最大値'], \
-                            index=items2)
-    st.markdown('#### 年間販売予測')
-    st.dataframe(df_pred)
-
-    ############################################################品番絞込み
-    st.markdown('#### 品番検索')
-
-    #品番検索
-    part_word = st.text_input(
-        '頭品番 例SN',
-        key='whole_pw'
-    )
-
-    if part_word != '':
-
-        item_list = []
-        for item in df_now2['品番'].unique():
-            if part_word in item:
-                item_list.append(item)
-
-        selected_item = st.selectbox(
-            '品番',
-            item_list,
-            key='sl'
-        )
-        df_now3 = df_now2[df_now2['品番'] == selected_item]
-        df_last3 = df_last2[df_last2['品番'] == selected_item]
-
-        s_now = df_now3.groupby('得意先名')[selected_base].sum()
-        s_last = df_last3.groupby('得意先名')[selected_base].sum()
-
-        s_now = s_now.sort_values()
-        s_last = s_last.sort_values()
-
-        #可視化
-        st.markdown('##### 数量の分布/箱ひげ')
-        st.write('得意先数')
-        st.write(len(s_now))
-        graph.make_box(s_now, s_last, ['今期', '前期'])
-
-        #試算
-        
-        st.markdown('##### 年間販売予測')
-        df_pred2 = df_pred[df_pred.index == selected_item]
-        st.write(f'■ 中央値: {round(s_now.median()*span_rate)}')
-        st.write(f'■ 上位90%: {round(s_now.quantile(0.9)*span_rate)}')
-        st.write(f'■ 最大値: {round(s_now.max()*span_rate)}')
-     
     
-    fc.fukabori(df_now, df_now2, graph)
+    st.write(f'■ 中央値: {round(s_cust_now.median()*span_rate)}')
+    st.write(f'■ 上位90%: {round(s_cust_now.quantile(0.9)*span_rate)}')
+    st.write(f'■ 最大値: {round(s_cust_now.max()*span_rate)}')
+    
+    fc.fukabori2(hinban, df_now, df_now2, graph)
 
 
 #*****************************************************数量ランキング/購入した得意先＋アイテム　スケール調整
@@ -323,20 +316,73 @@ def cnt_per_cust():
 
         df_now2[selected_base] = df_now2[selected_base].fillna(0)
     
+    
+    
     #グループ化
     df_calc = df_now2.groupby(['商品コード2', '得意先名'], as_index=False)[selected_base].sum()
-
+    df_closing = df_now2.groupby(['商品コード2', '得意先名'], as_index=False)['伝票番号2'].count()
 
     df_calc =df_calc.merge(df_scale, left_on='得意先名', right_index=True, how='left')
 
     col_name = f'{selected_base}/scale'
-
     df_calc[col_name] = round(df_calc[selected_base] * df_calc['scale_rate'], 1)
+
+    df_calc = df_calc.merge(df_closing, on=['商品コード2', '得意先名'], how='left')
+    df_calc.rename(columns={'伝票番号2': '伝票数'}, inplace=True)
     
     df_calc.sort_values(selected_base, ascending=False, inplace=True)
     st.dataframe(df_calc)
 
-    fc.fukabori(df_now, df_now2, graph)
+    #足切りライン1
+    st.markdown('##### 足切り1: /scale')
+    ft_line1 = st.number_input(
+        'foot_cut_line',
+        key='foot_cut1')
+    
+    df_calc2 = df_calc[df_calc[col_name] >= ft_line1]
+    st.dataframe(df_calc2)
+
+    #足切りライン2
+    st.markdown('##### 足切り2: 金額or数量')
+    ft_line2 = st.number_input(
+        'foot_cut_line',
+        key='foot_cut2')
+    
+    df_calc2 = df_calc2[df_calc2[selected_base] >= ft_line2]
+    st.dataframe(df_calc2)
+
+    st.markdown('##### 深堀する品番の選択')
+    hinbans = sorted(list(df_calc2['商品コード2'].unique()))
+    hinban = st.selectbox(
+        '品番の選択',
+        hinbans,
+        key='hinban'
+    )
+    
+    #深堀関数
+    fc.fukabori2(hinban, df_now, df_now2, graph)
+
+    #箱ひげ
+    df_hinban_now = df_now2[df_now2['品番']==hinban]
+    s_cust_now = df_hinban_now.groupby('得意先名')[selected_base].sum()
+
+    #可視化
+    st.markdown('##### 数量の分布/箱ひげ')
+    st.write('得意先数')
+    st.write(len(s_cust_now))
+    graph.make_box_now(s_cust_now, '今期')
+
+    #試算
+    
+    st.markdown('##### 年間販売予測')
+
+    data_span =  (df_now['受注日'].max() - df_now['受注日'].min()).days
+    #days属性を使用してTimedeltaオブジェクトの日数を取得
+    span_rate = 365 / data_span
+    
+    st.write(f'■ 中央値: {round(s_cust_now.median()*span_rate)}')
+    st.write(f'■ 上位90%: {round(s_cust_now.quantile(0.9)*span_rate)}')
+    st.write(f'■ 最大値: {round(s_cust_now.max()*span_rate)}')
 
 ###########################################################################################展示分析
 def tenji():
@@ -530,6 +576,18 @@ def tenji():
     st.write('■ 順位/全国')
     st.write(f'全国得意先数: {len(df_sales)}')
     st.write(f'順位: {df_sales.index.get_loc(cust_name) + 1}')
+
+def corr():
+    st.markdown('### 相関分析')
+
+    with st.expander('df_base', expanded=False):
+        df_base = fc.make_data_corr(df_now)
+        st.write(df_base)
+
+    df_corr = df_base.corr()
+    st.write(df_corr)
+
+    
     
 
  
@@ -546,7 +604,8 @@ def main():
         '-': None,
         'アイテム別概要': overview,
         '回転数/アイテム+店舗':cnt_per_cust,
-        '展示分析': tenji
+        '展示分析': tenji,
+        '相関分析': corr
           
     }
     selected_app_name = st.sidebar.selectbox(label='分析項目の選択',
