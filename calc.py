@@ -288,7 +288,10 @@ def overview():
 
     total_now = df_hinban_now[selected_base].sum()
     total_last = df_hinban_last[selected_base].sum()
-    comparison = round(total_now / total_last, 1)
+    if total_last == 0:
+        comparison = 0
+    else:
+        comparison = round(total_now / total_last, 1)
 
     st.markdown('##### 前年比')
     graph.make_bar([total_now, total_last], ['今期', '前期'])
