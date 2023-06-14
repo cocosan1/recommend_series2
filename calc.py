@@ -87,7 +87,7 @@ else:
 #*****************************************************graphインスタンス
 graph = Graph()
 
-#**********************************************************商品別概要
+#**********************************************************商品別概要 前年比
 def overview():
     st.markdown('### アイテム概要')
 
@@ -169,6 +169,49 @@ def overview():
         with st.expander('一覧', expanded=False):
             st.dataframe(s_last2g) 
     
+    #偏差値
+    #標準偏差
+    std_now = s_now2g.std(ddof=0)
+    std_last = s_last2g.std(ddof=0)
+    #平均
+    mean_now = s_now2g.mean()
+    mean_last = s_last2g.mean()
+
+    df_now_temp = pd.DataFrame(s_now2g)
+    df_last_temp = pd.DataFrame(s_last2g)
+
+    df_nowlast = df_now_temp.merge(df_last_temp, left_index=True, right_index=True, how='left')
+    df_nowlast = df_nowlast.rename(columns={f'{selected_base}_x': '今期', f'{selected_base}_y': '前期'})
+   
+    df_nowlast = df_nowlast.fillna(0)
+    df_nowlast['偏差値/今期'] = df_nowlast['今期'].map(lambda x: (x - mean_now) / std_now * 10 + 50)
+    df_nowlast['偏差値/前期'] = df_nowlast['前期'].map(lambda x: (x - mean_last) / std_last * 10 + 50)
+    df_nowlast['偏差値/今期'] = df_nowlast['偏差値/今期'].map(lambda x: round(x, 2))
+    df_nowlast['偏差値/前期'] = df_nowlast['偏差値/前期'].map(lambda x: round(x, 2))
+    df_nowlast['偏差値/推移'] = df_nowlast['偏差値/今期'] - df_nowlast['偏差値/前期']
+
+    st.markdown('上昇順/下降順')
+    updown = st.selectbox('選択',
+                 ['上昇順', '下降順'],
+                 key='updown')
+    if updown == '上昇順':
+        df30 = df_nowlast.sort_values('偏差値/推移', ascending=False)
+        df30 = df30[:30]
+        df30.sort_values('偏差値/推移', ascending=True, inplace=True)
+
+    elif updown == '下降順':
+        df30 = df_nowlast.sort_values('偏差値/推移', ascending=True)
+        df30 = df30[:30]
+        df30.sort_values('偏差値/推移', ascending=False, inplace=True)
+    
+
+
+    st.markdown('##### 偏差値推移Top30')
+    graph.make_bar_h_nonline(df30['偏差値/推移'], df30.index, '推移', '偏差値推移/対前年', 700)
+
+    with st.expander('df_nowlast', expanded=False):
+        st.dataframe(df_nowlast)
+
     #数量データ分布一覧/itemベース
     items = []
     cnts = []
@@ -207,7 +250,8 @@ def overview():
                              '伝票数'], index=items)
     
     st.markdown('#### 分布状況/アイテムベース')
-    st.dataframe(df_calc)
+    with st.expander('df_calc', expanded=False):
+        st.dataframe(df_calc)
 
     st.markdown('##### 下限ライン')
     line_cust = st.number_input('得意先数', value=0, key='line_cust')
@@ -226,9 +270,10 @@ def overview():
     df_calc2 = df_calc2[df_calc2['最大値'] >= line_max]
     df_calc2 = df_calc2[df_calc2['span2575'] >= line_span]
 
-    st.dataframe(df_calc2)
+    with st.expander('df_calc', expanded=False):
+        st.dataframe(df_calc2)
 
-    st.markdown('##### 箱ひげ図を見る')
+    st.markdown('##### 品番分析')
     hinbans = sorted(list(df_calc2.index))
     hinban = st.selectbox(
         '品番の選択',
@@ -240,6 +285,14 @@ def overview():
     df_hinban_last = df_last2[df_last2['品番']==hinban]
     s_cust_now = df_hinban_now.groupby('得意先名')[selected_base].sum()
     s_cust_last = df_hinban_last.groupby('得意先名')[selected_base].sum()
+
+    total_now = df_hinban_now[selected_base].sum()
+    total_last = df_hinban_last[selected_base].sum()
+    comparison = round(total_now / total_last, 1)
+
+    st.markdown('##### 前年比')
+    graph.make_bar([total_now, total_last], ['今期', '前期'])
+    st.write(f'■ 対前年比: {comparison}')
     
 
     #可視化
@@ -261,6 +314,203 @@ def overview():
     st.write(f'■ 最大値: {round(s_cust_now.max()*span_rate)}')
     
     fc.fukabori2(hinban, df_now, df_now2, graph)
+
+#**********************************************************商品別概要 今期　複数グラフ
+def overview_now():
+    st.markdown('### アイテム概要/年換算')
+
+    selected_base = st.selectbox(
+        '分析ベース選択',
+        ['数量', '金額'],
+        key='ov_sbase'
+    )
+
+    #年換算
+    date_min = df_now['受注日'].min()
+    date_max = df_now['受注日'].max()
+    date_span = (date_max - date_min).days
+    date_rate = 365 / date_span
+
+    df_now_year = df_now.copy()
+    df_last_year = df_last.copy()
+    df_now_year[selected_base] = df_now_year[selected_base] * date_rate
+    df_last_year[selected_base] = df_last_year[selected_base] * date_rate
+    df_now_year[selected_base] = df_now_year[selected_base].astype('int')
+    df_last_year[selected_base] = df_last_year[selected_base].astype('int')
+
+
+
+    cate_list = ['リビングチェア', 'ダイニングチェア', 'ダイニングテーブル', 'リビングテーブル', 'キャビネット類']
+    selected_cate = st.selectbox(
+        '商品分類',
+        cate_list,
+        key='cl'
+    )
+    if selected_cate == 'リビングチェア':
+        df_now2 = df_now_year [(df_now_year['商　品　名'].str.contains('ｿﾌｧ1P')) | 
+                         (df_now_year['商　品　名'].str.contains('ｿﾌｧ2P')) |
+                         (df_now_year['商　品　名'].str.contains('ｿﾌｧ2.5P')) | 
+                         (df_now_year['商　品　名'].str.contains('ｿﾌｧ3P')) 
+                         ] 
+        
+        df_last2 = df_last_year[(df_last_year['商　品　名'].str.contains('ｿﾌｧ1P')) | 
+                           (df_last_year['商　品　名'].str.contains('ｿﾌｧ2P')) |
+                           (df_last_year['商　品　名'].str.contains('ｿﾌｧ2.5P')) | 
+                           (df_last_year['商　品　名'].str.contains('ｿﾌｧ3P')) 
+                           ] 
+            
+
+        df_now2['品番'] = df_now2['商　品　名'].apply(lambda x: x.split(' ')[0])
+        df_last2['品番'] = df_last2['商　品　名'].apply(lambda x: x.split(' ')[0])
+
+        df_now2[selected_base] = df_now2[selected_base].fillna(0)
+        df_last2[selected_base] = df_last2[selected_base].fillna(0)
+
+        s_now2g = df_now2.groupby('品番')[selected_base].sum()
+        s_last2g = df_last2.groupby('品番')[selected_base].sum()
+
+    else:
+        df_now2 = df_now_year[df_now_year['商品分類名2']==selected_cate]
+        df_last2 = df_last_year[df_last_year['商品分類名2']==selected_cate]
+
+        df_now2['品番'] = df_now2['商　品　名'].apply(lambda x: x.split(' ')[0])
+        df_last2['品番'] = df_last2['商　品　名'].apply(lambda x: x.split(' ')[0])
+
+        df_now2[selected_base] = df_now2[selected_base].fillna(0)
+        df_last2[selected_base] = df_last2[selected_base].fillna(0)
+
+
+        s_now2g = df_now2.groupby('品番')[selected_base].sum()
+        s_last2g = df_last2.groupby('品番')[selected_base].sum()
+    
+    st.write(f'【今期数量】{s_now2g.sum()} 【前期数量】{s_last2g.sum()} \
+             【対前年比】{s_now2g.sum() / s_last2g.sum():.2f}')
+    
+    with st.expander('数量グラフ', expanded=False):
+        st.markdown('#### 今期 Top30')
+        #上位30取り出し
+        s_temp_now = s_now2g.sort_values(ascending=False)
+        s_temp_now = s_temp_now[0:30]
+        #並べ替え
+        s_temp_now.sort_values(ascending=True, inplace=True)
+
+        graph.make_bar_h_nonline(s_temp_now, s_temp_now.index, '今期', selected_base, 700)
+    
+    with st.expander('数量df', expanded=False):
+        st.dataframe(s_now2g)
+    
+    
+    #数量データ分布一覧/itemベース
+    items = []
+    cnts = []
+    quan25s = []
+    medis = []
+    quan75s = []
+    quan90s = []
+    maxs = []
+    span2575s = []
+    den_cnts = []
+    for item in df_now2['品番'].unique():
+        items.append(item)
+        df_item = df_now2[df_now2['品番']==item]
+        s_cust = df_item.groupby('得意先名')[selected_base].sum()
+        
+        cnt = s_cust.count()
+        quan25 = round(s_cust.quantile(0.25), 1)
+        medi = s_cust.median()
+        quan75 = round(s_cust.quantile(0.75), 1)
+        quan90 = round(s_cust.quantile(0.9), 1)
+        max_num = s_cust.max()
+        span2575 = quan75 - quan25
+        den_cnt = df_item['伝票番号2'].nunique()
+
+        cnts.append(cnt)
+        quan25s.append(quan25)
+        medis.append(medi)
+        quan75s.append(quan75)
+        quan90s.append(quan90)
+        maxs.append(max_num)
+        span2575s.append(span2575)
+        den_cnts.append(den_cnt)
+
+    df_calc = pd.DataFrame(list(zip(cnts, quan25s, medis, quan75s, quan90s, maxs, span2575s, den_cnts)), \
+                    columns=['得意先数', '第2四分位', '中央値', '第3四分位', '上位10%', '最大値', 'span2575', \
+                             '伝票数'], index=items)
+    
+    st.markdown('#### 分布状況/年換算')
+
+    with st.expander('df_calc', expanded=False):
+        st.dataframe(df_calc)
+
+    st.markdown('##### 下限ライン')
+    line_cust = st.number_input('得意先数', value=0, key='line_cust')
+    line_25 = st.number_input('第2四分位', value=0, key='line_25')
+    line_medi = st.number_input('中央値', value=0, key='line_medi')
+    line_75 = st.number_input('第3四分位', value=0, key='line_75')
+    line_90 = st.number_input('上位10%', value=0, key='line_90')
+    line_max = st.number_input('最大値', value=0, key='line_max')
+    line_span = st.number_input('span2575', value=0, key='line_span')
+
+    df_calc2 = df_calc[df_calc['得意先数'] >= line_cust]
+    df_calc2 = df_calc2[df_calc2['第2四分位'] >= line_25]
+    df_calc2 = df_calc2[df_calc2['中央値'] >= line_medi]
+    df_calc2 = df_calc2[df_calc2['第3四分位'] >= line_75]
+    df_calc2 = df_calc2[df_calc2['上位10%'] >= line_90]
+    df_calc2 = df_calc2[df_calc2['最大値'] >= line_max]
+    df_calc2 = df_calc2[df_calc2['span2575'] >= line_span]
+
+    with st.expander('df_calc', expanded=False):
+        st.dataframe(df_calc2)
+    #外れ値削除
+    st.write('外れ値削除')
+    upper_line = st.number_input(
+        '上限売上',
+        key='ul'
+    )
+    df_calc2 = df_calc2[df_calc2['最大値'] <= upper_line]
+
+    #箱ひげ
+    hinbans = sorted(list(df_calc2.index))
+
+    df_hinban_now = df_now2[df_now2['品番'].isin(hinbans)]
+
+    #箱ひげ/何グラフ並べるか
+    nums = []
+    for i in range(len(hinbans)):
+        if (i % 13) == 0:
+            nums.append(i)
+    #最後の番号追加
+    nums.append(len(hinbans))
+    start_nums = nums.copy()
+    start_nums.remove(len(hinbans))
+    end_nums = nums.copy()
+    end_nums.remove(0)
+
+    # #可視化
+    st.markdown('##### 数量の分布/箱ひげ')
+    
+    for (start, end) in zip(start_nums, end_nums):
+        fig = go.Figure()
+        for hinban in hinbans[start : end]:
+            df = df_hinban_now[df_hinban_now['品番']==hinban]
+            s_now = df.groupby('得意先名')[selected_base].sum()
+
+            fig.add_trace(go.Box(y=s_now, name=hinban))
+    
+        # fig.update_traces(boxpoints='all', jitter=0.3)
+        fig.update_layout(showlegend=False) 
+        #散布図　jitter=0.3として散布図の幅(広がり方)を指定
+        st.plotly_chart(fig, use_container_width=True) 
+        #plotly_chart plotlyを使ってグラグ描画　グラフの幅が列の幅
+    
+    selected_item = st.selectbox(
+        '深堀する品番',
+        hinbans,
+        key='fukabori'
+    )
+
+    
+    fc.fukabori2(selected_item, df_now, df_now2, graph)
 
 
 #*****************************************************数量ランキング/購入した得意先＋アイテム　スケール調整
@@ -602,7 +852,8 @@ def main():
     # アプリケーション名と対応する関数のマッピング
     apps = {
         '-': None,
-        'アイテム別概要': overview,
+        'アイテム別概要/前年比': overview,
+        'アイテム別概要/今期 複数グラフ': overview_now,
         '回転数/アイテム+店舗':cnt_per_cust,
         '展示分析': tenji,
         '相関分析': corr
