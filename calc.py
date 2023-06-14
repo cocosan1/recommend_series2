@@ -103,6 +103,7 @@ def overview():
         cate_list,
         key='cl'
     )
+   
     if selected_cate == 'リビングチェア':
         df_now2 = df_now[(df_now['商　品　名'].str.contains('ｿﾌｧ1P')) | 
                          (df_now['商　品　名'].str.contains('ｿﾌｧ2P')) |
@@ -336,8 +337,8 @@ def overview_now():
 
     df_now_year = df_now.copy()
     df_last_year = df_last.copy()
-    df_now_year[selected_base] = df_now_year[selected_base] * date_rate
-    df_last_year[selected_base] = df_last_year[selected_base] * date_rate
+    df_now_year[selected_base] = df_now[selected_base] * date_rate
+    df_last_year[selected_base] = df_last[selected_base] * date_rate
     df_now_year[selected_base] = df_now_year[selected_base].astype('int')
     df_last_year[selected_base] = df_last_year[selected_base].astype('int')
 
@@ -413,6 +414,7 @@ def overview_now():
     maxs = []
     span2575s = []
     den_cnts = []
+    den_rates = []
     for item in df_now2['品番'].unique():
         items.append(item)
         df_item = df_now2[df_now2['品番']==item]
@@ -426,6 +428,7 @@ def overview_now():
         max_num = s_cust.max()
         span2575 = quan75 - quan25
         den_cnt = df_item['伝票番号2'].nunique()
+        den_rate = round(den_cnt / cnt, 1)
 
         cnts.append(cnt)
         quan25s.append(quan25)
@@ -435,15 +438,18 @@ def overview_now():
         maxs.append(max_num)
         span2575s.append(span2575)
         den_cnts.append(den_cnt)
+        den_rates.append(den_rate)
 
-    df_calc = pd.DataFrame(list(zip(cnts, quan25s, medis, quan75s, quan90s, maxs, span2575s, den_cnts)), \
+    df_calc = pd.DataFrame(list(zip(cnts, quan25s, medis, quan75s, quan90s, maxs, span2575s, den_cnts, \
+                                    den_rates)), \
                     columns=['得意先数', '第2四分位', '中央値', '第3四分位', '上位10%', '最大値', 'span2575', \
-                             '伝票数'], index=items)
+                             '伝票数', '伝票数/得意先数'], index=items)
     
     st.markdown('#### 分布状況/年換算')
 
     with st.expander('df_calc', expanded=False):
         st.dataframe(df_calc)
+
 
     st.markdown('##### 下限ライン')
     line_cust = st.number_input('得意先数', value=0, key='line_cust')
@@ -453,6 +459,7 @@ def overview_now():
     line_90 = st.number_input('上位10%', value=0, key='line_90')
     line_max = st.number_input('最大値', value=0, key='line_max')
     line_span = st.number_input('span2575', value=0, key='line_span')
+    line_dencnt = st.number_input('伝票数/得意先数', value=0, key='line_dencnt')
 
     df_calc2 = df_calc[df_calc['得意先数'] >= line_cust]
     df_calc2 = df_calc2[df_calc2['第2四分位'] >= line_25]
@@ -461,13 +468,15 @@ def overview_now():
     df_calc2 = df_calc2[df_calc2['上位10%'] >= line_90]
     df_calc2 = df_calc2[df_calc2['最大値'] >= line_max]
     df_calc2 = df_calc2[df_calc2['span2575'] >= line_span]
+    df_calc2 = df_calc2[df_calc2['伝票数/得意先数'] >= line_dencnt]
 
     with st.expander('df_calc', expanded=False):
         st.dataframe(df_calc2)
+
     #外れ値削除
-    st.write('外れ値削除')
+    st.markdown('##### ■ 外れ値削除 必須入力')
     upper_line = st.number_input(
-        '上限売上',
+        '上限最大値',
         key='ul'
     )
     df_calc2 = df_calc2[df_calc2['最大値'] <= upper_line]
@@ -547,8 +556,12 @@ def cnt_per_cust():
 
     for cust in df_now['得意先名'].unique():
         sum_cust = df_now[df_now['得意先名']==cust]['金額'].sum()
-        scale_rate = assumption / sum_cust
+        if sum_cust == 0:
+            scale_rate = 0
+        else:
+            scale_rate = assumption / sum_cust
         cust_dict_now[cust] = scale_rate
+        
     
     df_scale = pd.DataFrame(cust_dict_now, index= ['scale_rate']).T
     
@@ -633,9 +646,15 @@ def cnt_per_cust():
     #days属性を使用してTimedeltaオブジェクトの日数を取得
     span_rate = 365 / data_span
     
-    st.write(f'■ 中央値: {round(s_cust_now.median()*span_rate)}')
-    st.write(f'■ 上位90%: {round(s_cust_now.quantile(0.9)*span_rate)}')
-    st.write(f'■ 最大値: {round(s_cust_now.max()*span_rate)}')
+    if len(s_cust_now) == 0:
+        st.write('購入実績がありません')
+    else:
+        med = s_cust_now.median()*span_rate
+        st.write(f'■ 中央値: {round(med)}')
+        q90 = s_cust_now.quantile(0.9)*span_rate
+        st.write(f'■ 上位90%: {round(q90)}')
+        q100 = s_cust_now.max()*span_rate
+        st.write(f'■ 最大値: {round(q100)}')
 
 ###########################################################################################展示分析
 def tenji():

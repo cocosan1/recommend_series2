@@ -732,9 +732,16 @@ def fukabori2(hinban, df_now, df_now2, graph):
         df = df_now[df_now['伝票番号2'] == num]
         df_concat = pd.concat([df_concat, df], join='outer')
     
+    if len(df_concat) == 0:
+            st.write('購入実績がありません')
+    
     with st.expander('明細', expanded=False):
-        col_list = ['得意先名', '商　品　名', '数量', '伝票番号2']
-        st.table(df_concat[col_list])
+        if len(df_concat) == 0:
+            st.write('購入実績がありません')
+        else:
+            col_list = ['得意先名', '商　品　名', '数量', '伝票番号2']
+            st.table(df_concat[col_list])
+        
 
 
     link = '[アソシエーション分析](https://cocosan1-association-fullhinban-cmy4cf.streamlit.app/)'
