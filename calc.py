@@ -459,7 +459,7 @@ def overview_now():
     line_90 = st.number_input('上位10%', value=0, key='line_90')
     line_max = st.number_input('最大値', value=0, key='line_max')
     line_span = st.number_input('span2575', value=0, key='line_span')
-    line_dencnt = st.number_input('伝票数/得意先数', value=0, key='line_dencnt')
+    line_dencnt = st.number_input('伝票数/得意先数', step=0.1, key='line_dencnt')
 
     df_calc2 = df_calc[df_calc['得意先数'] >= line_cust]
     df_calc2 = df_calc2[df_calc2['第2四分位'] >= line_25]
