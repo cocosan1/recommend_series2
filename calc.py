@@ -666,6 +666,265 @@ def cnt_per_cust():
         q100 = s_cust_now.max()*span_rate
         st.write(f'■ 最大値: {round(q100)}')
 
+#*****************************************************ピンポイント品番分析
+def pinpoint():
+    st.markdown('#### ピンポイント品番分析/年間予測')
+
+    selected_base = st.selectbox(
+            '分析ベース選択',
+            ['数量', '金額'],
+            key='ov_sbase'
+        )
+
+    #年換算
+    date_min = df_now['受注日'].min()
+    date_max = df_now['受注日'].max()
+    date_span = (date_max - date_min).days
+    date_rate = 365 / date_span
+
+    df_now_year = df_now.copy()
+    df_last_year = df_last.copy()
+    df_now_year[selected_base] = df_now[selected_base] * date_rate
+    df_last_year[selected_base] = df_last[selected_base] * date_rate
+    df_now_year[selected_base] = df_now_year[selected_base].astype('int')
+    df_last_year[selected_base] = df_last_year[selected_base].astype('int')
+
+    cate_list = ['リビングチェア', 'ダイニングチェア', 'ダイニングテーブル', 'リビングテーブル', 'キャビネット類']
+    selected_cate = st.selectbox(
+        '商品分類',
+        cate_list,
+        key='cl'
+    )
+    if selected_cate == 'リビングチェア':
+        df_now2 = df_now_year [(df_now_year['商　品　名'].str.contains('ｿﾌｧ1P')) | 
+                            (df_now_year['商　品　名'].str.contains('ｿﾌｧ2P')) |
+                            (df_now_year['商　品　名'].str.contains('ｿﾌｧ2.5P')) | 
+                            (df_now_year['商　品　名'].str.contains('ｿﾌｧ3P')) 
+                            ] 
+        
+        df_last2 = df_last_year[(df_last_year['商　品　名'].str.contains('ｿﾌｧ1P')) | 
+                            (df_last_year['商　品　名'].str.contains('ｿﾌｧ2P')) |
+                            (df_last_year['商　品　名'].str.contains('ｿﾌｧ2.5P')) | 
+                            (df_last_year['商　品　名'].str.contains('ｿﾌｧ3P')) 
+                            ] 
+            
+
+        df_now2['品番'] = df_now2['商　品　名'].apply(lambda x: x.split(' ')[0])
+        df_last2['品番'] = df_last2['商　品　名'].apply(lambda x: x.split(' ')[0])
+
+        df_now2[selected_base] = df_now2[selected_base].fillna(0)
+        df_last2[selected_base] = df_last2[selected_base].fillna(0)
+
+        s_now2g = df_now2.groupby('品番')[selected_base].sum()
+        s_last2g = df_last2.groupby('品番')[selected_base].sum()
+
+    else:
+        df_now2 = df_now_year[df_now_year['商品分類名2']==selected_cate]
+        df_last2 = df_last_year[df_last_year['商品分類名2']==selected_cate]
+
+        df_now2['品番'] = df_now2['商　品　名'].apply(lambda x: x.split(' ')[0])
+        df_last2['品番'] = df_last2['商　品　名'].apply(lambda x: x.split(' ')[0])
+
+        df_now2[selected_base] = df_now2[selected_base].fillna(0)
+        df_last2[selected_base] = df_last2[selected_base].fillna(0)
+
+
+        s_now2g = df_now2.groupby('品番')[selected_base].sum()
+        s_last2g = df_last2.groupby('品番')[selected_base].sum()
+    
+    st.write(f'【今期数量】{s_now2g.sum()} 【前期数量】{s_last2g.sum()} \
+             【対前年比】{s_now2g.sum() / s_last2g.sum():.2f}')
+
+    hinban_list = sorted(list(df_now2['商品コード2'].unique()))
+    hinbans = st.multiselect(
+        '品番の選択/複数可',
+        hinban_list,
+        key='hinbans'
+    )
+    s_now = s_now2g[hinbans]
+    s_last = s_last2g[hinbans]
+
+    #一覧の作成
+    #数量データ分布一覧/itemベース
+    items = []
+    cnts = []
+    quan25s = []
+    medis = []
+    quan75s = []
+    quan90s = []
+    maxs = []
+    span2575s = []
+    den_cnts = []
+    den_rates = []
+    for item in hinbans:
+        items.append(item)
+        df_item = df_now2[df_now2['品番']==item]
+        s_cust = df_item.groupby('得意先名')[selected_base].sum()
+        
+        cnt = s_cust.count()
+        quan25 = round(s_cust.quantile(0.25), 1)
+        medi = s_cust.median()
+        quan75 = round(s_cust.quantile(0.75), 1)
+        quan90 = round(s_cust.quantile(0.9), 1)
+        max_num = s_cust.max()
+        span2575 = quan75 - quan25
+        den_cnt = df_item['伝票番号2'].nunique()
+        den_rate = round(den_cnt / cnt, 1)
+
+        cnts.append(cnt)
+        quan25s.append(quan25)
+        medis.append(medi)
+        quan75s.append(quan75)
+        quan90s.append(quan90)
+        maxs.append(max_num)
+        span2575s.append(span2575)
+        den_cnts.append(den_cnt)
+        den_rates.append(den_rate)
+
+    df_calc = pd.DataFrame(list(zip(cnts, quan25s, medis, quan75s, quan90s, maxs, span2575s, den_cnts, \
+                                    den_rates)), \
+                    columns=['得意先数', '第2四分位', '中央値', '第3四分位', '上位10%', '最大値', 'span2575', \
+                             '伝票数', '伝票数/得意先数'], index=items)
+    with st.expander('df_calc', expanded=False):
+        st.dataframe(df_calc)
+    
+    st.markdown('##### 得意先数')
+    graph.make_bar(df_calc['得意先数'], df_calc.index)
+
+    st.markdown('##### 伝票数/得意先数')
+    graph.make_bar(df_calc['伝票数/得意先数'], df_calc.index)
+    
+    st.markdown('##### 前年比')
+    graph.make_bar_nowlast(s_now, s_last, s_now.index)
+
+    #偏差値
+    #標準偏差
+    std_now = s_now2g.std(ddof=0)
+    std_last = s_last2g.std(ddof=0)
+    #平均
+    mean_now = s_now2g.mean()
+    mean_last = s_last2g.mean()
+
+    df_now_temp = pd.DataFrame(s_now2g)
+    df_last_temp = pd.DataFrame(s_last2g)
+
+    df_nowlast = df_now_temp.merge(df_last_temp, left_index=True, right_index=True, how='left')
+    df_nowlast = df_nowlast.rename(columns={f'{selected_base}_x': '今期', f'{selected_base}_y': '前期'})
+   
+    df_nowlast = df_nowlast.fillna(0)
+    df_nowlast['偏差値/今期'] = df_nowlast['今期'].map(lambda x: (x - mean_now) / std_now * 10 + 50)
+    df_nowlast['偏差値/前期'] = df_nowlast['前期'].map(lambda x: (x - mean_last) / std_last * 10 + 50)
+    df_nowlast['偏差値/今期'] = df_nowlast['偏差値/今期'].map(lambda x: round(x, 2))
+    df_nowlast['偏差値/前期'] = df_nowlast['偏差値/前期'].map(lambda x: round(x, 2))
+    df_nowlast['偏差値/推移'] = df_nowlast['偏差値/今期'] - df_nowlast['偏差値/前期']
+
+    st.markdown('##### 偏差値')
+    df_selected = df_nowlast.loc[hinbans]
+    graph.make_bar_nowlast(df_selected['偏差値/今期'], df_selected['偏差値/前期'], df_selected.index)
+
+
+    # #可視化
+    st.markdown('##### 数量の分布/箱ひげ')
+
+    df_hinban_now = df_now2[df_now2['品番'].isin(hinbans)]
+
+    
+    fig = go.Figure()
+    for hinban in hinbans:
+        df = df_hinban_now[df_hinban_now['品番']==hinban]
+        s_now = df.groupby('得意先名')[selected_base].sum()
+
+        fig.add_trace(go.Box(y=s_now, name=hinban))
+        fig.update_traces(boxpoints='all', jitter=0.3) 
+        #散布図　jitter=0.3として散布図の幅(広がり方)を指定
+
+    # fig.update_traces(boxpoints='all', jitter=0.3)
+    fig.update_layout(showlegend=False) 
+
+    st.plotly_chart(fig, use_container_width=True) 
+    #plotly_chart plotlyを使ってグラグ描画　グラフの幅が列の幅
+
+    ###############################得意先名＋アイテム分析
+    assumption = st.number_input(
+        '想定年間売上',
+        value=10000000,
+        key='assumption'
+    )
+
+    #スケール調整用の比率算出
+    #今期
+    cust_dict_now = {}
+
+    for cust in df_now['得意先名'].unique():
+        sum_cust = df_now[df_now['得意先名']==cust]['金額'].sum()
+        if sum_cust == 0:
+            scale_rate = 0
+        else:
+            scale_rate = assumption / sum_cust
+        cust_dict_now[cust] = scale_rate
+    
+    df_scale = pd.DataFrame(cust_dict_now, index= ['scale_rate']).T
+    
+    
+    
+    #グループ化
+    df_hinbans = df_now2[df_now2['品番'].isin(hinbans)]
+    df_calc2 = df_hinbans.groupby(['商品コード2', '得意先名'], as_index=False)[selected_base].sum()
+    df_closing2 = df_hinbans.groupby(['商品コード2', '得意先名'], as_index=False)['伝票番号2'].count()
+
+    df_calc2 =df_calc2.merge(df_scale, left_on='得意先名', right_index=True, how='left')
+
+    col_name = f'{selected_base}/scale'
+    df_calc2[col_name] = round(df_calc2[selected_base] * df_calc2['scale_rate'], 1)
+
+    df_calc2 = df_calc2.merge(df_closing2, on=['商品コード2', '得意先名'], how='left')
+    df_calc2.rename(columns={'伝票番号2': '伝票数'}, inplace=True)
+    
+    df_calc2.sort_values(selected_base, ascending=False, inplace=True)
+
+    with st.expander('df_calc2', expanded=False):
+        st.dataframe(df_calc2)
+
+    hinban2 = st.selectbox(
+        '品番の選択',
+        hinbans,
+        key='hinban2'
+    )
+
+
+        #深堀関数
+    fc.fukabori2(hinban2, df_now, df_now2, graph)
+
+    #箱ひげ
+    df_hinban_now = df_now2[df_now2['品番']==hinban2]
+    s_cust_now = df_hinban_now.groupby('得意先名')[selected_base].sum()
+
+    #可視化
+    st.markdown('##### 数量の分布/箱ひげ')
+    st.write('得意先数')
+    st.write(len(s_cust_now))
+    graph.make_box_now(s_cust_now, '今期')
+
+    #試算
+    
+    st.markdown('##### 年間販売予測')
+
+    data_span =  (df_now['受注日'].max() - df_now['受注日'].min()).days
+    #days属性を使用してTimedeltaオブジェクトの日数を取得
+    span_rate = 365 / data_span
+    
+    if len(s_cust_now) == 0:
+        st.write('購入実績がありません')
+    else:
+        med = s_cust_now.median()*span_rate
+        st.write(f'■ 中央値: {round(med)}')
+        q90 = s_cust_now.quantile(0.9)*span_rate
+        st.write(f'■ 上位90%: {round(q90)}')
+        q100 = s_cust_now.max()*span_rate
+        st.write(f'■ 最大値: {round(q100)}')
+
+
+
 ###########################################################################################展示分析
 def tenji():
     st.markdown('### 展示分析')
@@ -887,6 +1146,7 @@ def main():
         'アイテム別概要/前年比': overview,
         'アイテム別概要/今期 複数グラフ': overview_now,
         '回転数/アイテム+店舗':cnt_per_cust,
+        'ピンポイント品番分析': pinpoint,
         '展示分析': tenji,
         '相関分析': corr
           
