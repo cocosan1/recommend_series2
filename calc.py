@@ -614,7 +614,17 @@ def cnt_per_cust():
         'foot_cut_line',
         key='foot_cut2')
     
+
     df_calc2 = df_calc2[df_calc2[selected_base] >= ft_line2]
+    st.dataframe(df_calc2)
+
+     #足切りライン3
+    st.markdown('##### 足切り3: 伝票数')
+    ft_line3 = st.number_input(
+        'foot_cut_line',
+        key='foot_cut3')
+    
+    df_calc2 = df_calc2[df_calc2['伝票数'] >= ft_line3]
     st.dataframe(df_calc2)
 
     st.markdown('##### 深堀する品番の選択')
