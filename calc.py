@@ -582,7 +582,10 @@ def cnt_per_cust():
 
         df_now2[selected_base] = df_now2[selected_base].fillna(0)
     
+    df_now2['受注年月'] = df_now2['受注日'].dt.strftime("%Y-%m")
+    df_now2['受注年月'] = pd.to_datetime(df_now2['受注年月'])
     
+    st.write(df_now2)
     
     #グループ化
     df_calc = df_now2.groupby(['商品コード2', '得意先名'], as_index=False)[selected_base].sum()
@@ -595,6 +598,9 @@ def cnt_per_cust():
 
     df_calc = df_calc.merge(df_closing, on=['商品コード2', '得意先名'], how='left')
     df_calc.rename(columns={'伝票番号2': '伝票数'}, inplace=True)
+
+    col_name_closing = f'伝票数/scale'
+    df_calc[col_name_closing] = round(df_calc['伝票数'] * df_calc['scale_rate'], 1)
     
     df_calc.sort_values(selected_base, ascending=False, inplace=True)
     st.dataframe(df_calc)
@@ -609,24 +615,26 @@ def cnt_per_cust():
     st.dataframe(df_calc2)
 
     #足切りライン2
-    st.markdown('##### 足切り2: 金額or数量')
+    st.markdown('##### 足切り2: 伝票数/scale')
     ft_line2 = st.number_input(
         'foot_cut_line',
         key='foot_cut2')
     
 
-    df_calc2 = df_calc2[df_calc2[selected_base] >= ft_line2]
+    df_calc2 = df_calc2[df_calc2['伝票数/scale'] >= ft_line2]
     st.dataframe(df_calc2)
 
-     #足切りライン3
-    st.markdown('##### 足切り3: 伝票数')
+    #足切りライン3
+    st.markdown('##### 足切り3: 数量or金額')
     ft_line3 = st.number_input(
         'foot_cut_line',
         key='foot_cut3')
     
-    df_calc2 = df_calc2[df_calc2['伝票数'] >= ft_line3]
+
+    df_calc2 = df_calc2[df_calc2[selected_base] >= ft_line3]
     st.dataframe(df_calc2)
 
+    st.markdown('### 深堀/売上スケール調整なし')
     st.markdown('##### 深堀する品番の選択')
     hinbans = sorted(list(df_calc2['商品コード2'].unique()))
     hinban = st.selectbox(
@@ -637,6 +645,21 @@ def cnt_per_cust():
     
     #深堀関数
     fc.fukabori2(hinban, df_now, df_now2, graph)
+
+    #月次推移
+    st.markdown('##### 月次推移')
+    df_suii = df_now2[df_now2['品番']==hinban]
+    custs = list(df_suii['得意先名'].unique())
+    slct_cust = st.selectbox(
+        '得意先名選択',
+        custs,
+        key='slct_cust'
+    )
+    df_suii = df_suii[df_suii['得意先名']==slct_cust]
+    s_suii =df_suii.groupby('受注年月')[selected_base].sum()
+    #可視化
+    graph.make_line([s_suii], ['今期'], s_suii.index)
+
 
     #箱ひげ
     df_hinban_now = df_now2[df_now2['品番']==hinban]
@@ -732,6 +755,9 @@ def pinpoint():
         s_now2g = df_now2.groupby('品番')[selected_base].sum()
         s_last2g = df_last2.groupby('品番')[selected_base].sum()
     
+    df_now2['受注年月'] = df_now2['受注日'].dt.strftime("%Y-%m")
+    df_now2['受注年月'] = pd.to_datetime(df_now2['受注年月'])
+    
     st.write(f'【今期数量】{s_now2g.sum()} 【前期数量】{s_last2g.sum()} \
              【対前年比】{s_now2g.sum() / s_last2g.sum():.2f}')
 
@@ -742,6 +768,13 @@ def pinpoint():
         key='hinbans'
     )
     s_now = s_now2g[hinbans]
+    #前年の売上がない商品の対処
+    for hinban in hinbans:
+        if hinban in s_last2g.index:
+            continue
+        else:
+            s_last2g[hinban] = 0
+
     s_last = s_last2g[hinbans]
 
     #一覧の作成
@@ -793,9 +826,24 @@ def pinpoint():
 
     st.markdown('##### 伝票数/得意先数')
     graph.make_bar(df_calc['伝票数/得意先数'], df_calc.index)
+    st.write(df_calc['伝票数/得意先数'])
     
     st.markdown('##### 前年比')
     graph.make_bar_nowlast(s_now, s_last, s_now.index)
+
+    rates = []
+    indxs = []
+    for (now, last, indx) in zip(s_now, s_last, s_now.index):
+        if last == 0:
+            rate = 0
+        else:
+            rate = round(now / last, 2)
+
+        rates.append(rate)
+        indxs.append(indx)
+    s_rate = pd.Series(rates, index=indxs)
+    st.write(s_rate)
+
 
     #偏差値
     #標準偏差
@@ -845,46 +893,47 @@ def pinpoint():
     #plotly_chart plotlyを使ってグラグ描画　グラフの幅が列の幅
 
     ###############################得意先名＋アイテム分析
-    assumption = st.number_input(
-        '想定年間売上',
-        value=10000000,
-        key='assumption'
-    )
+    # assumption = st.number_input(
+    #     '想定年間売上',
+    #     value=10000000,
+    #     key='assumption'
+    # )
 
-    #スケール調整用の比率算出
-    #今期
-    cust_dict_now = {}
+    # #スケール調整用の比率算出
+    # #今期
+    # cust_dict_now = {}
 
-    for cust in df_now['得意先名'].unique():
-        sum_cust = df_now[df_now['得意先名']==cust]['金額'].sum()
-        if sum_cust == 0:
-            scale_rate = 0
-        else:
-            scale_rate = assumption / sum_cust
-        cust_dict_now[cust] = scale_rate
+    # for cust in df_now['得意先名'].unique():
+    #     sum_cust = df_now[df_now['得意先名']==cust]['金額'].sum()
+    #     if sum_cust == 0:
+    #         scale_rate = 0
+    #     else:
+    #         scale_rate = assumption / sum_cust
+    #     cust_dict_now[cust] = scale_rate
     
-    df_scale = pd.DataFrame(cust_dict_now, index= ['scale_rate']).T
+    # df_scale = pd.DataFrame(cust_dict_now, index= ['scale_rate']).T
     
     
     
-    #グループ化
-    df_hinbans = df_now2[df_now2['品番'].isin(hinbans)]
-    df_calc2 = df_hinbans.groupby(['商品コード2', '得意先名'], as_index=False)[selected_base].sum()
-    df_closing2 = df_hinbans.groupby(['商品コード2', '得意先名'], as_index=False)['伝票番号2'].count()
+    # #グループ化
+    # df_hinbans = df_now2[df_now2['品番'].isin(hinbans)]
+    # df_calc2 = df_hinbans.groupby(['商品コード2', '得意先名'], as_index=False)[selected_base].sum()
+    # df_closing2 = df_hinbans.groupby(['商品コード2', '得意先名'], as_index=False)['伝票番号2'].count()
 
-    df_calc2 =df_calc2.merge(df_scale, left_on='得意先名', right_index=True, how='left')
+    # df_calc2 =df_calc2.merge(df_scale, left_on='得意先名', right_index=True, how='left')
 
-    col_name = f'{selected_base}/scale'
-    df_calc2[col_name] = round(df_calc2[selected_base] * df_calc2['scale_rate'], 1)
+    # col_name = f'{selected_base}/scale'
+    # df_calc2[col_name] = round(df_calc2[selected_base] * df_calc2['scale_rate'], 1)
 
-    df_calc2 = df_calc2.merge(df_closing2, on=['商品コード2', '得意先名'], how='left')
-    df_calc2.rename(columns={'伝票番号2': '伝票数'}, inplace=True)
+    # df_calc2 = df_calc2.merge(df_closing2, on=['商品コード2', '得意先名'], how='left')
+    # df_calc2.rename(columns={'伝票番号2': '伝票数'}, inplace=True)
     
-    df_calc2.sort_values(selected_base, ascending=False, inplace=True)
+    # df_calc2.sort_values(selected_base, ascending=False, inplace=True)
 
-    with st.expander('df_calc2', expanded=False):
-        st.dataframe(df_calc2)
+    # with st.expander('df_calc2', expanded=False):
+    #     st.dataframe(df_calc2)
 
+    st.markdown('### 深堀り/売上調整なし')
     hinban2 = st.selectbox(
         '品番の選択',
         hinbans,
@@ -904,6 +953,20 @@ def pinpoint():
     st.write('得意先数')
     st.write(len(s_cust_now))
     graph.make_box_now(s_cust_now, '今期')
+
+    #月次推移
+    st.markdown('##### 月次推移')
+    df_suii = df_now2[df_now2['品番']==hinban]
+    custs = list(df_suii['得意先名'].unique())
+    slct_cust = st.selectbox(
+        '得意先名選択',
+        custs,
+        key='slct_cust'
+    )
+    df_suii = df_suii[df_suii['得意先名']==slct_cust]
+    s_suii =df_suii.groupby('受注年月')[selected_base].sum()
+    #可視化
+    graph.make_line([s_suii], ['今期'], s_suii.index)
 
     #試算
     
