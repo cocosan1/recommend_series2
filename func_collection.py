@@ -313,6 +313,12 @@ def pre_processing(df_now, df_last, selected_base, selected_cate):
         df_now2[selected_base] = df_now2[selected_base].fillna(0)
         df_last2[selected_base] = df_last2[selected_base].fillna(0)
 
+        df_now2['受注年月'] = df_now2['受注日'].dt.strftime("%Y-%m")
+        df_now2['受注年月'] = pd.to_datetime(df_now2['受注年月'])
+
+        df_last2['受注年月'] = df_last2['受注日'].dt.strftime("%Y-%m")
+        df_last2['受注年月'] = pd.to_datetime(df_last2['受注年月'])
+
     else:
         df_now2 = df_now[df_now['商品分類名2']==selected_cate]
         df_last2 = df_last[df_last['商品分類名2']==selected_cate]
@@ -322,6 +328,12 @@ def pre_processing(df_now, df_last, selected_base, selected_cate):
 
         df_now2[selected_base] = df_now2[selected_base].fillna(0)
         df_last2[selected_base] = df_last2[selected_base].fillna(0)
+
+        df_now2['受注年月'] = df_now2['受注日'].dt.strftime("%Y-%m")
+        df_now2['受注年月'] = pd.to_datetime(df_now2['受注年月'])
+
+        df_last2['受注年月'] = df_last2['受注日'].dt.strftime("%Y-%m")
+        df_last2['受注年月'] = pd.to_datetime(df_last2['受注年月'])
     
     return df_now2, df_last2
 ###############################################################################分布df作成
@@ -712,8 +724,7 @@ def fukabori(df_now, df_now2, graph):
 
 #*******************************************アイテムの深堀　品番渡し
 #******************データの絞込み
-def fukabori2(hinban, df_now, df_now2, graph):
-    st.markdown('#### 品番検索: 売れ筋分析 塗色/張地/得意先')
+def fukabori2(hinban, df_now, df_now2, selected_base, graph):
 
     df_select = df_now2[df_now2['品番'] == hinban]
 
@@ -749,6 +760,7 @@ def fukabori2(hinban, df_now, df_now2, graph):
         graph.make_bar_h_nonline(s_item[-20:], s_item.index[-20:], '数量', '売れ筋組み合わせ 塗色／張地', 800)
 
     #********************購入している得意先
+    st.markdown('##### 得意先別数量')
     s_sum = df_select.groupby('得意先名')['数量'].sum()
 
     s_sum = s_sum.sort_values(ascending=True)
@@ -774,7 +786,7 @@ def fukabori2(hinban, df_now, df_now2, graph):
         st.dataframe(df_cust)
     
     #********************得意先別深堀
-    st.markdown('##### 得意先を選択して明細を見る')
+    st.markdown('#### 得意先別分析')
     selected_cust = st.selectbox(
         '得意先を選択',
         df_cust.index,
@@ -791,7 +803,7 @@ def fukabori2(hinban, df_now, df_now2, graph):
 
     
     #アソシエーション分析へのリンク
-    st.markdown('#### 同時に買われているアイテムを見る')
+    st.markdown('##### 同時に買われているアイテムを見る')
     df_concat = pd.DataFrame()
     for num in df_cust2['伝票番号2']:
         df = df_now[df_now['伝票番号2'] == num]
@@ -807,22 +819,51 @@ def fukabori2(hinban, df_now, df_now2, graph):
             col_list = ['得意先名', '商　品　名', '数量', '伝票番号2']
             st.table(df_concat[col_list])
         
+    #箱ひげ
+    df_hinban_now = df_now2[df_now2['品番']==hinban]
+    s_cust_now = df_hinban_now.groupby('得意先名')[selected_base].sum()
 
+    #可視化
+    st.markdown('##### 数量の分布/箱ひげ')
+    st.write('得意先数')
+    st.write(len(s_cust_now))
+    graph.make_box_now(s_cust_now, '今期')
 
+    #月次推移
+    st.markdown('##### 月次推移')
+    df_suii = df_now2[df_now2['品番']==hinban]
+    df_suii = df_suii[df_suii['得意先名']==selected_cust]
+    s_suii =df_suii.groupby('受注年月')[selected_base].sum()
+
+    #可視化
+    graph.make_line([s_suii], ['今期'], s_suii.index)
+
+    #試算
+    
+    st.markdown('##### 年間販売予測')
+
+    data_span =  (df_now['受注日'].max() - df_now['受注日'].min()).days
+    #days属性を使用してTimedeltaオブジェクトの日数を取得
+    span_rate = 365 / data_span
+    
+    if len(s_cust_now) == 0:
+        st.write('購入実績がありません')
+    else:
+        med = s_cust_now.median()*span_rate
+        st.write(f'■ 中央値: {round(med)}')
+        q90 = s_cust_now.quantile(0.9)*span_rate
+        st.write(f'■ 上位90%: {round(q90)}')
+        q100 = s_cust_now.max()*span_rate
+        st.write(f'■ 最大値: {round(q100)}')
+    
     link = '[アソシエーション分析](https://cocosan1-association-fullhinban-cmy4cf.streamlit.app/)'
     st.markdown(link, unsafe_allow_html=True)
 
     return selected_cust
 
 ######################################################################深堀　ピンポイントの内容
-def fukabori3(df_now, df_last, selected_base, selected_cate,  graph, fc):
+def fukabori3(df_now, df_last, selected_base, selected_cate,  graph):
     st.markdown('#### ピンポイント品番分析/年間予測')
-
-    # selected_base = st.selectbox(
-    #         '分析ベース選択',
-    #         ['数量', '金額'],
-    #         key='f3_sb'
-    #     )
 
     #年換算
     date_min = df_now['受注日'].min()
@@ -837,44 +878,11 @@ def fukabori3(df_now, df_last, selected_base, selected_cate,  graph, fc):
     df_now_year[selected_base] = df_now_year[selected_base].astype('int')
     df_last_year[selected_base] = df_last_year[selected_base].astype('int')
 
-    # cate_list = ['リビングチェア', 'ダイニングチェア', 'ダイニングテーブル', 'リビングテーブル', 'キャビネット類']
-    # selected_cate = st.selectbox(
-    #     '商品分類',
-    #     cate_list,
-    #     key='cl'
-    # )
-    if selected_cate == 'リビングチェア':
-        # 含まない文字列のリストを作成
-        df_lnow = df_now[df_now['商品分類名2']=='リビングチェア']
-        df_llast = df_last[df_last['商品分類名2']=='リビングチェア']
+    #前処理
+    df_now2, df_last2 = pre_processing(df_now, df_last, selected_base, selected_cate)
 
-        exclude_strs = ['ｽﾂｰﾙ', 'ﾛｯｷﾝｸﾞﾁｪｱ', '肘木', 'ﾊﾟｰｿﾅﾙﾁｪｱ']
-        df_now2 = df_lnow[~df_lnow['商品分類名2'].str.contains('|'.join(exclude_strs))]
-        df_last2 = df_llast[~df_llast['商品分類名2'].str.contains('|'.join(exclude_strs))]
-            
-
-        df_now2['品番'] = df_now2['商　品　名'].apply(lambda x: x.split(' ')[0])
-        df_last2['品番'] = df_last2['商　品　名'].apply(lambda x: x.split(' ')[0])
-
-        df_now2[selected_base] = df_now2[selected_base].fillna(0)
-        df_last2[selected_base] = df_last2[selected_base].fillna(0)
-
-        s_now2g = df_now2.groupby('品番')[selected_base].sum()
-        s_last2g = df_last2.groupby('品番')[selected_base].sum()
-
-    else:
-        df_now2 = df_now_year[df_now_year['商品分類名2']==selected_cate]
-        df_last2 = df_last_year[df_last_year['商品分類名2']==selected_cate]
-
-        df_now2['品番'] = df_now2['商　品　名'].apply(lambda x: x.split(' ')[0])
-        df_last2['品番'] = df_last2['商　品　名'].apply(lambda x: x.split(' ')[0])
-
-        df_now2[selected_base] = df_now2[selected_base].fillna(0)
-        df_last2[selected_base] = df_last2[selected_base].fillna(0)
-
-
-        s_now2g = df_now2.groupby('品番')[selected_base].sum()
-        s_last2g = df_last2.groupby('品番')[selected_base].sum()
+    s_now2g = df_now2.groupby('品番')[selected_base].sum()
+    s_last2g = df_last2.groupby('品番')[selected_base].sum()
     
     df_now2['受注年月'] = df_now2['受注日'].dt.strftime("%Y-%m")
     df_now2['受注年月'] = pd.to_datetime(df_now2['受注年月'])
@@ -1039,46 +1047,7 @@ def fukabori3(df_now, df_last, selected_base, selected_cate,  graph, fc):
 
 
         #深堀関数
-    slct_cust = fc.fukabori2(hinban2, df_now, df_now2, graph)
-
-    #箱ひげ
-    df_hinban_now = df_now2[df_now2['品番']==hinban2]
-    s_cust_now = df_hinban_now.groupby('得意先名')[selected_base].sum()
-
-    #可視化
-    st.markdown('##### 数量の分布/箱ひげ')
-    st.write('得意先数')
-    st.write(len(s_cust_now))
-    graph.make_box_now(s_cust_now, '今期')
-
-    #月次推移
-    st.markdown('##### 月次推移')
-    df_suii = df_now2[df_now2['品番']==hinban2]
-    df_suii = df_suii[df_suii['得意先名']==slct_cust]
-    s_suii =df_suii.groupby('受注年月')[selected_base].sum()
-
-    #可視化
-    graph.make_line([s_suii], ['今期'], s_suii.index)
-
-    #試算
-    
-    st.markdown('##### 年間販売予測')
-
-    data_span =  (df_now['受注日'].max() - df_now['受注日'].min()).days
-    #days属性を使用してTimedeltaオブジェクトの日数を取得
-    span_rate = 365 / data_span
-    
-    if len(s_cust_now) == 0:
-        st.write('購入実績がありません')
-    else:
-        med = s_cust_now.median()*span_rate
-        st.write(f'■ 中央値: {round(med)}')
-        q90 = s_cust_now.quantile(0.9)*span_rate
-        st.write(f'■ 上位90%: {round(q90)}')
-        q100 = s_cust_now.max()*span_rate
-        st.write(f'■ 最大値: {round(q100)}')
-    
-
+    fukabori2(hinban2, df_now, df_now2, selected_base, graph)
 
 #************************************************************相関
 #index商品分類/col得意先/val売上

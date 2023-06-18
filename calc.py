@@ -219,7 +219,7 @@ def overview():
         df30.sort_values('偏差値/推移', ascending=False, inplace=True)
     
 
-    st.markdown('##### 偏差値推移Top30')
+    st.markdown('#### 偏差値推移Top30')
     graph.make_bar_h_nonline(df30['偏差値/推移'], df30.index, '推移', '偏差値推移/対前年', 700)
 
     with st.expander('df_nowlast', expanded=False):
@@ -253,7 +253,7 @@ def overview():
     with st.expander('df_calc', expanded=False):
         st.dataframe(df_calc2)
 
-    st.markdown('##### 品番分析')
+    st.markdown('#### 品番分析')
     hinbans = sorted(list(df_calc2.index))
     hinban = st.selectbox(
         '品番の選択',
@@ -296,7 +296,7 @@ def overview():
     st.write(f'■ 上位90%: {round(s_cust_now.quantile(0.9)*span_rate)}')
     st.write(f'■ 最大値: {round(s_cust_now.max()*span_rate)}')
     
-    fc.fukabori2(hinban, df_now, df_now2, graph)
+    fc.fukabori2(hinban, df_now, df_now2, selected_base, graph)
 
 #**********************************************************商品別概要 今期　複数グラフ
 def overview_now():
@@ -356,7 +356,7 @@ def overview_now():
     #数量データ分布一覧/itemベース
     df_calc = fc.make_bunpu(df_now2, selected_base)
     
-    st.markdown('#### 分布状況/年換算')
+    st.markdown('##### 分布状況/年換算')
 
     with st.expander('df_calc', expanded=False):
         st.dataframe(df_calc)
@@ -410,7 +410,7 @@ def overview_now():
     end_nums.remove(0)
 
     # #可視化
-    st.markdown('##### 数量の分布/箱ひげ')
+    st.markdown('#### 数量の分布/箱ひげ')
     
     for (start, end) in zip(start_nums, end_nums):
         fig = go.Figure()
@@ -427,7 +427,7 @@ def overview_now():
         #plotly_chart plotlyを使ってグラグ描画　グラフの幅が列の幅
     
 
-    fc.fukabori3(df_now, df_last, selected_base, selected_cate, graph, fc)
+    fc.fukabori3(df_now, df_last, selected_base, selected_cate, graph)
 
 
 #*****************************************************数量ランキング/購入した得意先＋アイテム　スケール調整
@@ -474,8 +474,8 @@ def cnt_per_cust():
     #前処理
     df_now2, df_last2 = fc.pre_processing(df_now, df_last, selected_base, selected_cate)
     
-    df_now2['受注年月'] = df_now2['受注日'].dt.strftime("%Y-%m")
-    df_now2['受注年月'] = pd.to_datetime(df_now2['受注年月'])
+    # df_now2['受注年月'] = df_now2['受注日'].dt.strftime("%Y-%m")
+    # df_now2['受注年月'] = pd.to_datetime(df_now2['受注年月'])
     
     
     #グループ化
@@ -535,47 +535,7 @@ def cnt_per_cust():
     )
     
     #深堀関数
-    slct_cust = fc.fukabori2(hinban, df_now, df_now2, graph)
-
-    
-
-    #月次推移
-    st.markdown('##### 月次推移')
-    df_suii = df_now2[df_now2['品番']==hinban]
-
-    df_suii = df_suii[df_suii['得意先名']==slct_cust]
-    s_suii =df_suii.groupby('受注年月')[selected_base].sum()
-    #可視化
-    graph.make_line([s_suii], ['今期'], s_suii.index)
-
-
-    #箱ひげ
-    df_hinban_now = df_now2[df_now2['品番']==hinban]
-    s_cust_now = df_hinban_now.groupby('得意先名')[selected_base].sum()
-
-    #可視化
-    st.markdown('##### 数量の分布/箱ひげ')
-    st.write('得意先数')
-    st.write(len(s_cust_now))
-    graph.make_box_now(s_cust_now, '今期')
-
-    #試算
-    
-    st.markdown('##### 年間販売予測')
-
-    data_span =  (df_now['受注日'].max() - df_now['受注日'].min()).days
-    #days属性を使用してTimedeltaオブジェクトの日数を取得
-    span_rate = 365 / data_span
-    
-    if len(s_cust_now) == 0:
-        st.write('購入実績がありません')
-    else:
-        med = s_cust_now.median()*span_rate
-        st.write(f'■ 中央値: {round(med)}')
-        q90 = s_cust_now.quantile(0.9)*span_rate
-        st.write(f'■ 上位90%: {round(q90)}')
-        q100 = s_cust_now.max()*span_rate
-        st.write(f'■ 最大値: {round(q100)}')
+    slct_cust = fc.fukabori2(hinban, df_now, df_now2, selected_base, graph)
 
 #*****************************************************ピンポイント品番分析
 def pinpoint():
@@ -776,44 +736,44 @@ def pinpoint():
 
 
         #深堀関数
-    slct_cust = fc.fukabori2(hinban2, df_now, df_now2, graph)
+    slct_cust = fc.fukabori2(hinban2, df_now, df_now2, selected_base, graph)
 
-    #箱ひげ
-    df_hinban_now = df_now2[df_now2['品番']==hinban2]
-    s_cust_now = df_hinban_now.groupby('得意先名')[selected_base].sum()
+    # #箱ひげ
+    # df_hinban_now = df_now2[df_now2['品番']==hinban2]
+    # s_cust_now = df_hinban_now.groupby('得意先名')[selected_base].sum()
 
-    #可視化
-    st.markdown('##### 数量の分布/箱ひげ')
-    st.write('得意先数')
-    st.write(len(s_cust_now))
-    graph.make_box_now(s_cust_now, '今期')
+    # #可視化
+    # st.markdown('##### 数量の分布/箱ひげ')
+    # st.write('得意先数')
+    # st.write(len(s_cust_now))
+    # graph.make_box_now(s_cust_now, '今期')
 
-    #月次推移
-    st.markdown('##### 月次推移')
-    df_suii = df_now2[df_now2['品番']==hinban2]
-    df_suii = df_suii[df_suii['得意先名']==slct_cust]
-    s_suii =df_suii.groupby('受注年月')[selected_base].sum()
+    # #月次推移
+    # st.markdown('##### 月次推移')
+    # df_suii = df_now2[df_now2['品番']==hinban2]
+    # df_suii = df_suii[df_suii['得意先名']==slct_cust]
+    # s_suii =df_suii.groupby('受注年月')[selected_base].sum()
 
-    #可視化
-    graph.make_line([s_suii], ['今期'], s_suii.index)
+    # #可視化
+    # graph.make_line([s_suii], ['今期'], s_suii.index)
 
-    #試算
+    # #試算
     
-    st.markdown('##### 年間販売予測')
+    # st.markdown('##### 年間販売予測')
 
-    data_span =  (df_now['受注日'].max() - df_now['受注日'].min()).days
-    #days属性を使用してTimedeltaオブジェクトの日数を取得
-    span_rate = 365 / data_span
+    # data_span =  (df_now['受注日'].max() - df_now['受注日'].min()).days
+    # #days属性を使用してTimedeltaオブジェクトの日数を取得
+    # span_rate = 365 / data_span
     
-    if len(s_cust_now) == 0:
-        st.write('購入実績がありません')
-    else:
-        med = s_cust_now.median()*span_rate
-        st.write(f'■ 中央値: {round(med)}')
-        q90 = s_cust_now.quantile(0.9)*span_rate
-        st.write(f'■ 上位90%: {round(q90)}')
-        q100 = s_cust_now.max()*span_rate
-        st.write(f'■ 最大値: {round(q100)}')
+    # if len(s_cust_now) == 0:
+    #     st.write('購入実績がありません')
+    # else:
+    #     med = s_cust_now.median()*span_rate
+    #     st.write(f'■ 中央値: {round(med)}')
+    #     q90 = s_cust_now.quantile(0.9)*span_rate
+    #     st.write(f'■ 上位90%: {round(q90)}')
+    #     q100 = s_cust_now.max()*span_rate
+    #     st.write(f'■ 最大値: {round(q100)}')
 
 
 
