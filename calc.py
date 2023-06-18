@@ -738,43 +738,6 @@ def pinpoint():
         #深堀関数
     slct_cust = fc.fukabori2(hinban2, df_now, df_now2, selected_base, graph)
 
-    # #箱ひげ
-    # df_hinban_now = df_now2[df_now2['品番']==hinban2]
-    # s_cust_now = df_hinban_now.groupby('得意先名')[selected_base].sum()
-
-    # #可視化
-    # st.markdown('##### 数量の分布/箱ひげ')
-    # st.write('得意先数')
-    # st.write(len(s_cust_now))
-    # graph.make_box_now(s_cust_now, '今期')
-
-    # #月次推移
-    # st.markdown('##### 月次推移')
-    # df_suii = df_now2[df_now2['品番']==hinban2]
-    # df_suii = df_suii[df_suii['得意先名']==slct_cust]
-    # s_suii =df_suii.groupby('受注年月')[selected_base].sum()
-
-    # #可視化
-    # graph.make_line([s_suii], ['今期'], s_suii.index)
-
-    # #試算
-    
-    # st.markdown('##### 年間販売予測')
-
-    # data_span =  (df_now['受注日'].max() - df_now['受注日'].min()).days
-    # #days属性を使用してTimedeltaオブジェクトの日数を取得
-    # span_rate = 365 / data_span
-    
-    # if len(s_cust_now) == 0:
-    #     st.write('購入実績がありません')
-    # else:
-    #     med = s_cust_now.median()*span_rate
-    #     st.write(f'■ 中央値: {round(med)}')
-    #     q90 = s_cust_now.quantile(0.9)*span_rate
-    #     st.write(f'■ 上位90%: {round(q90)}')
-    #     q100 = s_cust_now.max()*span_rate
-    #     st.write(f'■ 最大値: {round(q100)}')
-
 
 
 ###########################################################################################展示分析
@@ -813,44 +776,27 @@ def tenji():
     if cust_name == '':
         st.info('得意先を選択してください')
         st.stop()
-
+    
+    #######################################数量or金額
+    st.markdown('#### 展示品の分析')
+    selected_base = st.selectbox(
+        '分析ベース選択',
+        ['数量', '金額'],
+        key='tenji_sbase'
+    )
 
     #######################################展示品の分析
-    st.markdown('#### 展示品の分析')
+    
     cate_list = ['リビングチェア', 'ダイニングチェア', 'ダイニングテーブル', 'リビングテーブル', 'キャビネット類']
     selected_cate = st.selectbox(
         '商品分類',
         cate_list,
         key='tenji_cl'
     )
-    if selected_cate == 'リビングチェア':
-        # 含まない文字列のリストを作成
-        df_lnow = df_now[df_now['商品分類名2']=='リビングチェア']
-        df_llast = df_last[df_last['商品分類名2']=='リビングチェア']
-
-        exclude_strs = ['ｽﾂｰﾙ', 'ﾛｯｷﾝｸﾞﾁｪｱ', '肘木', 'ﾊﾟｰｿﾅﾙﾁｪｱ']
-        df_now2 = df_lnow[~df_lnow['商品分類名2'].str.contains('|'.join(exclude_strs))]
-        df_last2 = df_llast[~df_llast['商品分類名2'].str.contains('|'.join(exclude_strs))]
-            
-
-        df_now2['品番'] = df_now2['商　品　名'].apply(lambda x: x.split(' ')[0])
-        df_last2['品番'] = df_last2['商　品　名'].apply(lambda x: x.split(' ')[0])
-
-        df_now2['金額'] = df_now2['金額'].fillna(0)
-        df_last2['金額'] = df_last2['金額'].fillna(0)
-
-        s_now2g = df_now2.groupby('品番')['金額'].sum()
-        s_last2g = df_last2.groupby('品番')['金額'].sum()
-
-    else:
-        df_now2 = df_now[df_now['商品分類名2']==selected_cate]
-        df_last2 = df_last[df_last['商品分類名2']==selected_cate]
-
-        df_now2['品番'] = df_now2['商　品　名'].apply(lambda x: x.split(' ')[0])
-        df_last2['品番'] = df_last2['商　品　名'].apply(lambda x: x.split(' ')[0])
-
-        df_now2['金額'] = df_now2['金額'].fillna(0)
-        df_last2['金額'] = df_last2['金額'].fillna(0)
+    df_now2, df_last2 = fc.pre_processing(df_now, df_last, selected_base, selected_cate)
+    
+    s_now2g = df_now2.groupby('品番')['金額'].sum()
+    s_last2g = df_last2.groupby('品番')['金額'].sum()
 
     ###############################データスケール調整
      #数量データ分布一覧/itemベース
@@ -859,8 +805,12 @@ def tenji():
     assumption = st.number_input(
         '想定年間売上',
         value=10000000,
-        key='assumption'
+        key='tenji_assumption'
     )
+
+    #店別合計金額の算出
+    s_sum = df_base.groupby('得意先名')[selected_base].sum()
+    s_sum.rename('合計',inplace=True)
 
     items = []
 
@@ -874,8 +824,13 @@ def tenji():
         df_base = df_base.merge(df, left_index=True, right_index=True, how='left')
     
     df_base = df_base.fillna(0)
+
+    #df_baseと合計のmerge
+    df_base = pd.merge(df_base, s_sum.to_frame(), left_index=True, right_index=True, how='outer')
     with st.expander('df_base', expanded=False):
         st.dataframe(df_base)
+    
+    
 
     #スケール調整用の比率算出
     cust_dict = {}
