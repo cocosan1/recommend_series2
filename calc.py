@@ -103,43 +103,12 @@ def overview():
         cate_list,
         key='cl'
     )
-   
-    if selected_cate == 'リビングチェア':
-        df_now2 = df_now[(df_now['商　品　名'].str.contains('ｿﾌｧ1P')) | 
-                         (df_now['商　品　名'].str.contains('ｿﾌｧ2P')) |
-                         (df_now['商　品　名'].str.contains('ｿﾌｧ2.5P')) | 
-                         (df_now['商　品　名'].str.contains('ｿﾌｧ3P')) 
-                         ] 
-        
-        df_last2 = df_last[(df_last['商　品　名'].str.contains('ｿﾌｧ1P')) | 
-                           (df_last['商　品　名'].str.contains('ｿﾌｧ2P')) |
-                           (df_last['商　品　名'].str.contains('ｿﾌｧ2.5P')) | 
-                           (df_last['商　品　名'].str.contains('ｿﾌｧ3P')) 
-                           ] 
-            
 
-        df_now2['品番'] = df_now2['商　品　名'].apply(lambda x: x.split(' ')[0])
-        df_last2['品番'] = df_last2['商　品　名'].apply(lambda x: x.split(' ')[0])
+    #前処理
+    df_now2, df_last2 = fc.pre_processing(df_now, df_last, selected_base, selected_cate)
 
-        df_now2[selected_base] = df_now2[selected_base].fillna(0)
-        df_last2[selected_base] = df_last2[selected_base].fillna(0)
-
-        s_now2g = df_now2.groupby('品番')[selected_base].sum()
-        s_last2g = df_last2.groupby('品番')[selected_base].sum()
-
-    else:
-        df_now2 = df_now[df_now['商品分類名2']==selected_cate]
-        df_last2 = df_last[df_last['商品分類名2']==selected_cate]
-
-        df_now2['品番'] = df_now2['商　品　名'].apply(lambda x: x.split(' ')[0])
-        df_last2['品番'] = df_last2['商　品　名'].apply(lambda x: x.split(' ')[0])
-
-        df_now2[selected_base] = df_now2[selected_base].fillna(0)
-        df_last2[selected_base] = df_last2[selected_base].fillna(0)
-
-
-        s_now2g = df_now2.groupby('品番')[selected_base].sum()
-        s_last2g = df_last2.groupby('品番')[selected_base].sum()
+    s_now2g = df_now2.groupby('品番')[selected_base].sum()
+    s_last2g = df_last2.groupby('品番')[selected_base].sum()
     
     st.write(f'【今期数量】{s_now2g.sum()} 【前期数量】{s_last2g.sum()} \
              【対前年比】{s_now2g.sum() / s_last2g.sum():.2f}')
@@ -154,8 +123,13 @@ def overview():
         s_temp_now.sort_values(ascending=True, inplace=True)
 
         graph.make_bar_h_nonline(s_temp_now, s_temp_now.index, '今期', selected_base, 700)
+
+        #item数
+        cnt_item = len(s_now2g)
+        st.write(f'item: {cnt_item}')
         
         with st.expander('一覧', expanded=False):
+            s_now2g = s_now2g.sort_values(ascending=False)
             st.dataframe(s_now2g)
 
     with col2:
@@ -166,8 +140,13 @@ def overview():
         #並べ替え
         s_temp_last.sort_values(ascending=True, inplace=True)
         graph.make_bar_h_nonline(s_temp_last, s_temp_last.index, '前期', selected_base, 700)
+
+        #item数
+        cnt_item = len(s_last2g)
+        st.write(f'item: {cnt_item}')
         
         with st.expander('一覧', expanded=False):
+            s_last2g = s_last2g.sort_values(ascending=False)
             st.dataframe(s_last2g) 
     
     #偏差値
@@ -191,6 +170,40 @@ def overview():
     df_nowlast['偏差値/前期'] = df_nowlast['偏差値/前期'].map(lambda x: round(x, 2))
     df_nowlast['偏差値/推移'] = df_nowlast['偏差値/今期'] - df_nowlast['偏差値/前期']
 
+    col1, col2 = st.columns(2)
+    with col1:
+        st.markdown('#### 今期/偏差値 Top30')
+        df_nowlast = df_nowlast.sort_values('偏差値/今期', ascending=False)
+        df_nowtemp = df_nowlast[0:30]
+        df_nowtemp = df_nowtemp.sort_values('偏差値/今期', ascending=True)
+
+        graph.make_bar_h_nonline(df_nowtemp['偏差値/今期'], df_nowtemp.index, \
+                                 '今期', '偏差値/今期', 700)
+        
+        #item数
+        cnt_item = len(s_now2g)
+        st.write(f'item: {cnt_item}')
+
+        with st.expander('df_nowlast["偏差値/今期"]', expanded=False):
+            st.dataframe(df_nowlast["偏差値/今期"])
+    
+    with col2:
+        st.markdown('#### 前期/偏差値 Top30')
+        df_nowlast = df_nowlast.sort_values('偏差値/前期', ascending=False)
+        df_lasttemp = df_nowlast[0:30]
+        df_lasttemp = df_lasttemp.sort_values('偏差値/前期', ascending=True)
+
+        graph.make_bar_h_nonline(df_lasttemp['偏差値/前期'], df_lasttemp.index, \
+                                 '前期', '偏差値/前期', 700)
+        
+        #item数
+        cnt_item = len(s_last2g)
+        st.write(f'item: {cnt_item}')
+
+        with st.expander('df_nowlast["偏差値/前期"]', expanded=False):
+            st.dataframe(df_nowlast["偏差値/前期"])
+
+
     st.markdown('上昇順/下降順')
     updown = st.selectbox('選択',
                  ['上昇順', '下降順'],
@@ -206,49 +219,15 @@ def overview():
         df30.sort_values('偏差値/推移', ascending=False, inplace=True)
     
 
-
     st.markdown('##### 偏差値推移Top30')
     graph.make_bar_h_nonline(df30['偏差値/推移'], df30.index, '推移', '偏差値推移/対前年', 700)
 
     with st.expander('df_nowlast', expanded=False):
         st.dataframe(df_nowlast)
 
+
     #数量データ分布一覧/itemベース
-    items = []
-    cnts = []
-    quan25s = []
-    medis = []
-    quan75s = []
-    quan90s = []
-    maxs = []
-    span2575s = []
-    den_cnts = []
-    for item in df_now2['品番'].unique():
-        items.append(item)
-        df_item = df_now2[df_now2['品番']==item]
-        s_cust = df_item.groupby('得意先名')[selected_base].sum()
-        
-        cnt = s_cust.count()
-        quan25 = round(s_cust.quantile(0.25), 1)
-        medi = s_cust.median()
-        quan75 = round(s_cust.quantile(0.75), 1)
-        quan90 = round(s_cust.quantile(0.9), 1)
-        max_num = s_cust.max()
-        span2575 = quan75 - quan25
-        den_cnt = df_item['伝票番号2'].nunique()
-
-        cnts.append(cnt)
-        quan25s.append(quan25)
-        medis.append(medi)
-        quan75s.append(quan75)
-        quan90s.append(quan90)
-        maxs.append(max_num)
-        span2575s.append(span2575)
-        den_cnts.append(den_cnt)
-
-    df_calc = pd.DataFrame(list(zip(cnts, quan25s, medis, quan75s, quan90s, maxs, span2575s, den_cnts)), \
-                    columns=['得意先数', '第2四分位', '中央値', '第3四分位', '上位10%', '最大値', 'span2575', \
-                             '伝票数'], index=items)
+    df_calc = fc.make_bunpu(df_now2, selected_base)
     
     st.markdown('#### 分布状況/アイテムベース')
     with st.expander('df_calc', expanded=False):
@@ -350,42 +329,12 @@ def overview_now():
         cate_list,
         key='cl'
     )
-    if selected_cate == 'リビングチェア':
-        df_now2 = df_now_year [(df_now_year['商　品　名'].str.contains('ｿﾌｧ1P')) | 
-                         (df_now_year['商　品　名'].str.contains('ｿﾌｧ2P')) |
-                         (df_now_year['商　品　名'].str.contains('ｿﾌｧ2.5P')) | 
-                         (df_now_year['商　品　名'].str.contains('ｿﾌｧ3P')) 
-                         ] 
-        
-        df_last2 = df_last_year[(df_last_year['商　品　名'].str.contains('ｿﾌｧ1P')) | 
-                           (df_last_year['商　品　名'].str.contains('ｿﾌｧ2P')) |
-                           (df_last_year['商　品　名'].str.contains('ｿﾌｧ2.5P')) | 
-                           (df_last_year['商　品　名'].str.contains('ｿﾌｧ3P')) 
-                           ] 
-            
 
-        df_now2['品番'] = df_now2['商　品　名'].apply(lambda x: x.split(' ')[0])
-        df_last2['品番'] = df_last2['商　品　名'].apply(lambda x: x.split(' ')[0])
+    #前処理
+    df_now2, df_last2 = fc.pre_processing(df_now, df_last, selected_base, selected_cate)
 
-        df_now2[selected_base] = df_now2[selected_base].fillna(0)
-        df_last2[selected_base] = df_last2[selected_base].fillna(0)
-
-        s_now2g = df_now2.groupby('品番')[selected_base].sum()
-        s_last2g = df_last2.groupby('品番')[selected_base].sum()
-
-    else:
-        df_now2 = df_now_year[df_now_year['商品分類名2']==selected_cate]
-        df_last2 = df_last_year[df_last_year['商品分類名2']==selected_cate]
-
-        df_now2['品番'] = df_now2['商　品　名'].apply(lambda x: x.split(' ')[0])
-        df_last2['品番'] = df_last2['商　品　名'].apply(lambda x: x.split(' ')[0])
-
-        df_now2[selected_base] = df_now2[selected_base].fillna(0)
-        df_last2[selected_base] = df_last2[selected_base].fillna(0)
-
-
-        s_now2g = df_now2.groupby('品番')[selected_base].sum()
-        s_last2g = df_last2.groupby('品番')[selected_base].sum()
+    s_now2g = df_now2.groupby('品番')[selected_base].sum()
+    s_last2g = df_last2.groupby('品番')[selected_base].sum()
     
     st.write(f'【今期数量】{s_now2g.sum()} 【前期数量】{s_last2g.sum()} \
              【対前年比】{s_now2g.sum() / s_last2g.sum():.2f}')
@@ -405,45 +354,7 @@ def overview_now():
     
     
     #数量データ分布一覧/itemベース
-    items = []
-    cnts = []
-    quan25s = []
-    medis = []
-    quan75s = []
-    quan90s = []
-    maxs = []
-    span2575s = []
-    den_cnts = []
-    den_rates = []
-    for item in df_now2['品番'].unique():
-        items.append(item)
-        df_item = df_now2[df_now2['品番']==item]
-        s_cust = df_item.groupby('得意先名')[selected_base].sum()
-        
-        cnt = s_cust.count()
-        quan25 = round(s_cust.quantile(0.25), 1)
-        medi = s_cust.median()
-        quan75 = round(s_cust.quantile(0.75), 1)
-        quan90 = round(s_cust.quantile(0.9), 1)
-        max_num = s_cust.max()
-        span2575 = quan75 - quan25
-        den_cnt = df_item['伝票番号2'].nunique()
-        den_rate = round(den_cnt / cnt, 1)
-
-        cnts.append(cnt)
-        quan25s.append(quan25)
-        medis.append(medi)
-        quan75s.append(quan75)
-        quan90s.append(quan90)
-        maxs.append(max_num)
-        span2575s.append(span2575)
-        den_cnts.append(den_cnt)
-        den_rates.append(den_rate)
-
-    df_calc = pd.DataFrame(list(zip(cnts, quan25s, medis, quan75s, quan90s, maxs, span2575s, den_cnts, \
-                                    den_rates)), \
-                    columns=['得意先数', '第2四分位', '中央値', '第3四分位', '上位10%', '最大値', 'span2575', \
-                             '伝票数', '伝票数/得意先数'], index=items)
+    df_calc = fc.make_bunpu(df_now2, selected_base)
     
     st.markdown('#### 分布状況/年換算')
 
@@ -515,14 +426,8 @@ def overview_now():
         st.plotly_chart(fig, use_container_width=True) 
         #plotly_chart plotlyを使ってグラグ描画　グラフの幅が列の幅
     
-    selected_item = st.selectbox(
-        '深堀する品番',
-        hinbans,
-        key='fukabori'
-    )
 
-    
-    fc.fukabori2(selected_item, df_now, df_now2, graph)
+    fc.fukabori3(df_now, df_last, selected_base, selected_cate, graph, fc)
 
 
 #*****************************************************数量ランキング/購入した得意先＋アイテム　スケール調整
@@ -566,26 +471,12 @@ def cnt_per_cust():
     df_scale = pd.DataFrame(cust_dict_now, index= ['scale_rate']).T
     
     
-    if selected_cate == 'リビングチェア':
-        df_now2 = df_now[(df_now['商　品　名'].str.contains('ｿﾌｧ1P')) | 
-                            (df_now['商　品　名'].str.contains('ｿﾌｧ2P')) |
-                            (df_now['商　品　名'].str.contains('ｿﾌｧ2.5P')) | 
-                            (df_now['商　品　名'].str.contains('ｿﾌｧ3P')) 
-                            ] 
-
-        df_now2['品番'] = df_now2['商　品　名'].apply(lambda x: x.split(' ')[0])
-        df_now2[selected_base] = df_now2[selected_base].fillna(0)
-
-    else:
-        df_now2 = df_now[df_now['商品分類名2']==selected_cate]
-        df_now2['品番'] = df_now2['商　品　名'].apply(lambda x: x.split(' ')[0])
-
-        df_now2[selected_base] = df_now2[selected_base].fillna(0)
+    #前処理
+    df_now2, df_last2 = fc.pre_processing(df_now, df_last, selected_base, selected_cate)
     
     df_now2['受注年月'] = df_now2['受注日'].dt.strftime("%Y-%m")
     df_now2['受注年月'] = pd.to_datetime(df_now2['受注年月'])
     
-    st.write(df_now2)
     
     #グループ化
     df_calc = df_now2.groupby(['商品コード2', '得意先名'], as_index=False)[selected_base].sum()
@@ -644,17 +535,14 @@ def cnt_per_cust():
     )
     
     #深堀関数
-    fc.fukabori2(hinban, df_now, df_now2, graph)
+    slct_cust = fc.fukabori2(hinban, df_now, df_now2, graph)
+
+    
 
     #月次推移
     st.markdown('##### 月次推移')
     df_suii = df_now2[df_now2['品番']==hinban]
-    custs = list(df_suii['得意先名'].unique())
-    slct_cust = st.selectbox(
-        '得意先名選択',
-        custs,
-        key='slct_cust'
-    )
+
     df_suii = df_suii[df_suii['得意先名']==slct_cust]
     s_suii =df_suii.groupby('受注年月')[selected_base].sum()
     #可視化
@@ -718,42 +606,12 @@ def pinpoint():
         cate_list,
         key='cl'
     )
-    if selected_cate == 'リビングチェア':
-        df_now2 = df_now_year [(df_now_year['商　品　名'].str.contains('ｿﾌｧ1P')) | 
-                            (df_now_year['商　品　名'].str.contains('ｿﾌｧ2P')) |
-                            (df_now_year['商　品　名'].str.contains('ｿﾌｧ2.5P')) | 
-                            (df_now_year['商　品　名'].str.contains('ｿﾌｧ3P')) 
-                            ] 
-        
-        df_last2 = df_last_year[(df_last_year['商　品　名'].str.contains('ｿﾌｧ1P')) | 
-                            (df_last_year['商　品　名'].str.contains('ｿﾌｧ2P')) |
-                            (df_last_year['商　品　名'].str.contains('ｿﾌｧ2.5P')) | 
-                            (df_last_year['商　品　名'].str.contains('ｿﾌｧ3P')) 
-                            ] 
-            
 
-        df_now2['品番'] = df_now2['商　品　名'].apply(lambda x: x.split(' ')[0])
-        df_last2['品番'] = df_last2['商　品　名'].apply(lambda x: x.split(' ')[0])
+    #前処理
+    df_now2, df_last2 = fc.pre_processing(df_now, df_last, selected_base, selected_cate)
 
-        df_now2[selected_base] = df_now2[selected_base].fillna(0)
-        df_last2[selected_base] = df_last2[selected_base].fillna(0)
-
-        s_now2g = df_now2.groupby('品番')[selected_base].sum()
-        s_last2g = df_last2.groupby('品番')[selected_base].sum()
-
-    else:
-        df_now2 = df_now_year[df_now_year['商品分類名2']==selected_cate]
-        df_last2 = df_last_year[df_last_year['商品分類名2']==selected_cate]
-
-        df_now2['品番'] = df_now2['商　品　名'].apply(lambda x: x.split(' ')[0])
-        df_last2['品番'] = df_last2['商　品　名'].apply(lambda x: x.split(' ')[0])
-
-        df_now2[selected_base] = df_now2[selected_base].fillna(0)
-        df_last2[selected_base] = df_last2[selected_base].fillna(0)
-
-
-        s_now2g = df_now2.groupby('品番')[selected_base].sum()
-        s_last2g = df_last2.groupby('品番')[selected_base].sum()
+    s_now2g = df_now2.groupby('品番')[selected_base].sum()
+    s_last2g = df_last2.groupby('品番')[selected_base].sum()
     
     df_now2['受注年月'] = df_now2['受注日'].dt.strftime("%Y-%m")
     df_now2['受注年月'] = pd.to_datetime(df_now2['受注年月'])
@@ -870,13 +728,27 @@ def pinpoint():
     df_selected = df_nowlast.loc[hinbans]
     graph.make_bar_nowlast(df_selected['偏差値/今期'], df_selected['偏差値/前期'], df_selected.index)
 
+    col1, col2 = st.columns(2)
+    with col1:
+        df_rank_now = df_nowlast['今期'].rank(ascending=False)
+        df_rank_now = df_rank_now.loc[hinbans]
+        st.write('順位')
+        st.write(df_rank_now)
+        st.write(f'item: {len(s_now2g)}')
+    
+    with col2:
+        df_rank_last = df_nowlast['前期'].rank(ascending=False)
+        df_rank_last = df_rank_last.loc[hinbans]
+        st.write('順位')
+        st.write(df_rank_last)
+        st.write(f'item: {len(s_last2g)}')
+
 
     # #可視化
     st.markdown('##### 数量の分布/箱ひげ')
 
     df_hinban_now = df_now2[df_now2['品番'].isin(hinbans)]
 
-    
     fig = go.Figure()
     for hinban in hinbans:
         df = df_hinban_now[df_hinban_now['品番']==hinban]
@@ -892,47 +764,9 @@ def pinpoint():
     st.plotly_chart(fig, use_container_width=True) 
     #plotly_chart plotlyを使ってグラグ描画　グラフの幅が列の幅
 
-    ###############################得意先名＋アイテム分析
-    # assumption = st.number_input(
-    #     '想定年間売上',
-    #     value=10000000,
-    #     key='assumption'
-    # )
 
-    # #スケール調整用の比率算出
-    # #今期
-    # cust_dict_now = {}
 
-    # for cust in df_now['得意先名'].unique():
-    #     sum_cust = df_now[df_now['得意先名']==cust]['金額'].sum()
-    #     if sum_cust == 0:
-    #         scale_rate = 0
-    #     else:
-    #         scale_rate = assumption / sum_cust
-    #     cust_dict_now[cust] = scale_rate
-    
-    # df_scale = pd.DataFrame(cust_dict_now, index= ['scale_rate']).T
-    
-    
-    
-    # #グループ化
-    # df_hinbans = df_now2[df_now2['品番'].isin(hinbans)]
-    # df_calc2 = df_hinbans.groupby(['商品コード2', '得意先名'], as_index=False)[selected_base].sum()
-    # df_closing2 = df_hinbans.groupby(['商品コード2', '得意先名'], as_index=False)['伝票番号2'].count()
-
-    # df_calc2 =df_calc2.merge(df_scale, left_on='得意先名', right_index=True, how='left')
-
-    # col_name = f'{selected_base}/scale'
-    # df_calc2[col_name] = round(df_calc2[selected_base] * df_calc2['scale_rate'], 1)
-
-    # df_calc2 = df_calc2.merge(df_closing2, on=['商品コード2', '得意先名'], how='left')
-    # df_calc2.rename(columns={'伝票番号2': '伝票数'}, inplace=True)
-    
-    # df_calc2.sort_values(selected_base, ascending=False, inplace=True)
-
-    # with st.expander('df_calc2', expanded=False):
-    #     st.dataframe(df_calc2)
-
+    #深堀
     st.markdown('### 深堀り/売上調整なし')
     hinban2 = st.selectbox(
         '品番の選択',
@@ -942,7 +776,7 @@ def pinpoint():
 
 
         #深堀関数
-    fc.fukabori2(hinban2, df_now, df_now2, graph)
+    slct_cust = fc.fukabori2(hinban2, df_now, df_now2, graph)
 
     #箱ひげ
     df_hinban_now = df_now2[df_now2['品番']==hinban2]
@@ -956,15 +790,10 @@ def pinpoint():
 
     #月次推移
     st.markdown('##### 月次推移')
-    df_suii = df_now2[df_now2['品番']==hinban]
-    custs = list(df_suii['得意先名'].unique())
-    slct_cust = st.selectbox(
-        '得意先名選択',
-        custs,
-        key='slct_cust'
-    )
+    df_suii = df_now2[df_now2['品番']==hinban2]
     df_suii = df_suii[df_suii['得意先名']==slct_cust]
     s_suii =df_suii.groupby('受注年月')[selected_base].sum()
+
     #可視化
     graph.make_line([s_suii], ['今期'], s_suii.index)
 
@@ -1035,17 +864,13 @@ def tenji():
         key='tenji_cl'
     )
     if selected_cate == 'リビングチェア':
-        df_now2 = df_now[(df_now['商　品　名'].str.contains('ｿﾌｧ1P')) | 
-                         (df_now['商　品　名'].str.contains('ｿﾌｧ2P')) |
-                         (df_now['商　品　名'].str.contains('ｿﾌｧ2.5P')) | 
-                         (df_now['商　品　名'].str.contains('ｿﾌｧ3P')) 
-                         ] 
-        
-        df_last2 = df_last[(df_last['商　品　名'].str.contains('ｿﾌｧ1P')) | 
-                           (df_last['商　品　名'].str.contains('ｿﾌｧ2P')) |
-                           (df_last['商　品　名'].str.contains('ｿﾌｧ2.5P')) | 
-                           (df_last['商　品　名'].str.contains('ｿﾌｧ3P')) 
-                           ] 
+        # 含まない文字列のリストを作成
+        df_lnow = df_now[df_now['商品分類名2']=='リビングチェア']
+        df_llast = df_last[df_last['商品分類名2']=='リビングチェア']
+
+        exclude_strs = ['ｽﾂｰﾙ', 'ﾛｯｷﾝｸﾞﾁｪｱ', '肘木', 'ﾊﾟｰｿﾅﾙﾁｪｱ']
+        df_now2 = df_lnow[~df_lnow['商品分類名2'].str.contains('|'.join(exclude_strs))]
+        df_last2 = df_llast[~df_llast['商品分類名2'].str.contains('|'.join(exclude_strs))]
             
 
         df_now2['品番'] = df_now2['商　品　名'].apply(lambda x: x.split(' ')[0])
