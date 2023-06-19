@@ -743,23 +743,36 @@ def pinpoint():
 ###########################################################################################展示分析
 def tenji():
     st.markdown('### 展示分析')
-    st.write('★ 更新は submiit ボタンで!')
 
-    df_base = pd.read_excel(
-        uploaded_file_now, sheet_name='受注委託移動在庫生産照会', usecols=[1, 3, 15, 16, 42, 50])  # index　ナンバー不要　index_col=0
+    selected_base = st.selectbox(
+            '分析ベース選択',
+            ['数量', '金額'],
+            key='ov_sbase'
+        )
+    
+    cate_list = ['リビングチェア', 'ダイニングチェア', 'ダイニングテーブル', 'リビングテーブル', 'キャビネット類']
+    selected_cate = st.selectbox(
+        '商品分類',
+        cate_list,
+        key='cl'
+    )
 
-    #index:item/col:cust
-    df_zenkoku = fc.make_data_cust(df_base)
+    #前処理
+    df_now2, df_last2 = fc.pre_processing(df_now, df_last, selected_base, selected_cate)
 
-    with st.expander('df_zenkoku'):
-        st.write(df_zenkoku)
+    s_now2g = df_now2.groupby('品番')[selected_base].sum()
+    s_last2g = df_last2.groupby('品番')[selected_base].sum()
+    
+    st.write(f'【今期数量】{s_now2g.sum()} 【前期数量】{s_last2g.sum()} \
+             【対前年比】{s_now2g.sum() / s_last2g.sum():.2f}')
+
     
     ########################得意先の選択
     st.markdown('####  得意先の選択')
     cust_text = st.text_input('得意先名の一部を入力 例）ケンポ')
 
     cust_list = []
-    for cust_name in df_zenkoku.columns:
+    for cust_name in df_now2['得意先名'].unique():
         if cust_text in cust_name:
             cust_list.append(cust_name)
 
@@ -777,27 +790,6 @@ def tenji():
         st.info('得意先を選択してください')
         st.stop()
     
-    #######################################数量or金額
-    st.markdown('#### 展示品の分析')
-    selected_base = st.selectbox(
-        '分析ベース選択',
-        ['数量', '金額'],
-        key='tenji_sbase'
-    )
-
-    #######################################展示品の分析
-    
-    cate_list = ['リビングチェア', 'ダイニングチェア', 'ダイニングテーブル', 'リビングテーブル', 'キャビネット類']
-    selected_cate = st.selectbox(
-        '商品分類',
-        cate_list,
-        key='tenji_cl'
-    )
-    df_now2, df_last2 = fc.pre_processing(df_now, df_last, selected_base, selected_cate)
-    
-    s_now2g = df_now2.groupby('品番')['金額'].sum()
-    s_last2g = df_last2.groupby('品番')['金額'].sum()
-
     ###############################データスケール調整
      #数量データ分布一覧/itemベース
 
@@ -808,118 +800,123 @@ def tenji():
         key='tenji_assumption'
     )
 
+
     #店別合計金額の算出
-    s_sum = df_base.groupby('得意先名')[selected_base].sum()
+    s_sum = df_now.groupby('得意先名')[selected_base].sum()
     s_sum.rename('合計',inplace=True)
 
-    items = []
+    df_sum = s_sum.to_frame()
+    st.write(df_sum)
 
-    df_base = pd.DataFrame(index=df_now2['得意先名'].unique())
-    for item in df_now2['品番'].unique():
-        items.append(item)
-        df_item = df_now2[df_now2['品番']==item]
-        s_cust = df_item.groupby('得意先名')['金額'].sum()
-        df = pd.DataFrame(s_cust)
-        df.rename(columns={'金額': item}, inplace=True)
-        df_base = df_base.merge(df, left_index=True, right_index=True, how='left')
+
+    # items = []
+
+    # df_base = pd.DataFrame(index=df_now2['得意先名'].unique())
+    # for item in df_now2['品番'].unique():
+    #     items.append(item)
+    #     df_item = df_now2[df_now2['品番']==item]
+    #     s_cust = df_item.groupby('得意先名')['金額'].sum()
+    #     df = pd.DataFrame(s_cust)
+    #     df.rename(columns={'金額': item}, inplace=True)
+    #     df_base = df_base.merge(df, left_index=True, right_index=True, how='left')
     
-    df_base = df_base.fillna(0)
+    # df_base = df_base.fillna(0)
 
-    #df_baseと合計のmerge
-    df_base = pd.merge(df_base, s_sum.to_frame(), left_index=True, right_index=True, how='outer')
-    with st.expander('df_base', expanded=False):
-        st.dataframe(df_base)
+    # #df_baseと合計のmerge
+    # df_base = pd.merge(df_base, s_sum.to_frame(), left_index=True, right_index=True, how='outer')
+    # with st.expander('df_base', expanded=False):
+    #     st.dataframe(df_base)
     
     
 
-    #スケール調整用の比率算出
-    cust_dict = {}
-    #計算用に転置
-    df_baset = df_base.T
-    df_scale = pd.DataFrame()
-    for cust in df_baset.columns:
-        sum_cust = df_baset[cust].sum()
-        scale_rate = assumption / sum_cust
-        df_scale[cust] = round(df_baset[cust] * scale_rate)
+    # #スケール調整用の比率算出
+    # cust_dict = {}
+    # #計算用に転置
+    # df_baset = df_base.T
+    # df_scale = pd.DataFrame()
+    # for cust in df_baset.columns:
+    #     sum_cust = df_baset[cust].sum()
+    #     scale_rate = assumption / sum_cust
+    #     df_scale[cust] = round(df_baset[cust] * scale_rate)
     
-    with st.expander('df_scale', expanded=False):
-        st.dataframe(df_scale)
+    # with st.expander('df_scale', expanded=False):
+    #     st.dataframe(df_scale)
     
-    #転置 index得意先/col品番
-    df_scalet = df_scale.T
-    df_scalet.fillna(0, inplace=True)
+    # #転置 index得意先/col品番
+    # df_scalet = df_scale.T
+    # df_scalet.fillna(0, inplace=True)
 
 
-    #偏差値化
-    df_deviation = pd.DataFrame(index=df_scalet.index)
-    for item in df_scalet.columns:
-        df = df_scalet[item]
-        #販売した得意先だけで集計する
-        df = df[df > 0]
-        #標準偏差 母分散・母標準偏差ddof=0
-        df_std = df.std(ddof=0)
-        #平均値
-        df_mean = df.mean()
-        #偏差値
-        df_deviation[item] = ((df_scalet[item] - df_mean) / df_std * 10 + 50)
-        df_deviation.replace([np.inf, -np.inf, np.nan], 0, inplace=True)
-        df_deviation = df_deviation.round(1)
+    # #偏差値化
+    # df_deviation = pd.DataFrame(index=df_scalet.index)
+    # for item in df_scalet.columns:
+    #     df = df_scalet[item]
+    #     #販売した得意先だけで集計する
+    #     df = df[df > 0]
+    #     #標準偏差 母分散・母標準偏差ddof=0
+    #     df_std = df.std(ddof=0)
+    #     #平均値
+    #     df_mean = df.mean()
+    #     #偏差値
+    #     df_deviation[item] = ((df_scalet[item] - df_mean) / df_std * 10 + 50)
+    #     df_deviation.replace([np.inf, -np.inf, np.nan], 0, inplace=True)
+    #     df_deviation = df_deviation.round(1)
     
-    #得意先に絞ったseries
-    s_cust_std = df_deviation.loc[cust_name]
+    # #得意先に絞ったseries
+    # s_cust_std = df_deviation.loc[cust_name]
 
-    with st.expander('df_cust_std', expanded=False):
-        st.dataframe(s_cust_std)
+    # with st.expander('df_cust_std', expanded=False):
+    #     st.dataframe(s_cust_std)
     
-    #得意先の売上が0のitem行を削除
-    df_non0 = df_scale[df_scale[cust_name] != 0]
-    non0s = df_non0.index
+    # #得意先の売上が0のitem行を削除
+    # df_non0 = df_scale[df_scale[cust_name] != 0]
+    # non0s = df_non0.index
 
-    s_cust_std = s_cust_std.loc[non0s]
+    # s_cust_std = s_cust_std.loc[non0s]
 
-    s_cust_std.sort_values(ascending=False, inplace=True)
-    #可視化
-    st.markdown('##### 販売商品/偏差値')
-    graph.make_bar(s_cust_std, s_cust_std.index)
+    # s_cust_std.sort_values(ascending=False, inplace=True)
+    # #可視化
+    # st.markdown('##### 販売商品/偏差値')
+    # graph.make_bar(s_cust_std, s_cust_std.index)
 
-    st.write('売上合計偏差値')
-    #index得意先col売上のseries
-    zenkoku_dict = {}
-    for cust in df_zenkoku.columns:
-        cust_sum = df_zenkoku[cust].sum()
-        zenkoku_dict[cust] = cust_sum
+    # st.write('売上合計偏差値')
+    # #index得意先col売上のseries
+    # zenkoku_dict = {}
+    # for cust in df_zenkoku.columns:
+    #     cust_sum = df_zenkoku[cust].sum()
+    #     zenkoku_dict[cust] = cust_sum
 
-    df_sales = pd.DataFrame(zenkoku_dict, index=['売上']).T
+    # df_sales = pd.DataFrame(zenkoku_dict, index=['売上']).T
 
-    #偏差値化
-    df_deviation2 = pd.DataFrame(index=df_sales.index)
+    # #偏差値化
+    # df_deviation2 = pd.DataFrame(index=df_sales.index)
 
-    #標準偏差 母分散・母標準偏差ddof=0
-    s_std2 = df_sales.std(ddof=0)
+    # #標準偏差 母分散・母標準偏差ddof=0
+    # s_std2 = df_sales.std(ddof=0)
 
-    #平均値
-    s_mean2 = df_sales.mean()
+    # #平均値
+    # s_mean2 = df_sales.mean()
 
-    #偏差値
-    df_deviation2['偏差値'] = ((df_sales - s_mean2) / s_std2 * 10 + 50)
-    df_deviation2.replace([np.inf, -np.inf, np.nan], 0, inplace=True)
-    df_deviation2 = df_deviation2.round(1)
-    df_sales.sort_values('売上', ascending=False, inplace=True)
-    df_deviation2.sort_values('偏差値', ascending=False, inplace=True)
+    # #偏差値
+    # df_deviation2['偏差値'] = ((df_sales - s_mean2) / s_std2 * 10 + 50)
+    # df_deviation2.replace([np.inf, -np.inf, np.nan], 0, inplace=True)
+    # df_deviation2 = df_deviation2.round(1)
+    # df_sales.sort_values('売上', ascending=False, inplace=True)
+    # df_deviation2.sort_values('偏差値', ascending=False, inplace=True)
 
-    with st.expander('s_sales', expanded=False):
-        st.write(df_sales)
-    with st.expander('s_deviation2', expanded=False):
-        st.write(df_deviation2)
+    # with st.expander('s_sales', expanded=False):
+    #     st.write(df_sales)
+    # with st.expander('s_deviation2', expanded=False):
+    #     st.write(df_deviation2)
     
-    cust_dev = df_deviation2.loc[cust_name]
-    st.write('■ 偏差値: 売上/全国')
-    st.write(cust_dev)
+    # cust_dev = df_deviation2.loc[cust_name]
+    # st.write('■ 偏差値: 売上/全国')
+    # st.write(cust_dev)
 
-    #全国順位
-    st.write('■ 順位/全国')
-    st.write(f'全国得意先数: {len(df_sales)}')
-    st.write(f'順位: {df_sales.index.get_loc(cust_name) + 1}')
+    # #全国順位
+    # st.write('■ 順位/全国')
+    # st.write(f'全国得意先数: {len(df_sales)}')
+    # st.write(f'順位: {df_sales.index.get_loc(cust_name) + 1}')
 
 def corr():
     st.markdown('### 相関分析')
