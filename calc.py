@@ -241,6 +241,8 @@ def overview():
     line_90 = st.number_input('上位10%', value=0, key='line_90')
     line_max = st.number_input('最大値', value=0, key='line_max')
     line_span = st.number_input('span2575', value=0, key='line_span')
+    denmax = st.number_input('伝票数max', value=0, key='denmax')
+    denrate = st.number_input('伝票数/得意先数', step=0.1, key='denrate')
 
     df_calc2 = df_calc[df_calc['得意先数'] >= line_cust]
     df_calc2 = df_calc2[df_calc2['第2四分位'] >= line_25]
@@ -249,6 +251,8 @@ def overview():
     df_calc2 = df_calc2[df_calc2['上位10%'] >= line_90]
     df_calc2 = df_calc2[df_calc2['最大値'] >= line_max]
     df_calc2 = df_calc2[df_calc2['span2575'] >= line_span]
+    df_calc2 = df_calc2[df_calc2['伝票数/max'] >= denmax]
+    df_calc2 = df_calc2[df_calc2['伝票数/得意先数'] >= denrate]
 
     with st.expander('df_calc', expanded=False):
         st.dataframe(df_calc2)
@@ -370,7 +374,8 @@ def overview_now():
     line_90 = st.number_input('上位10%', value=0, key='line_90')
     line_max = st.number_input('最大値', value=0, key='line_max')
     line_span = st.number_input('span2575', value=0, key='line_span')
-    line_dencnt = st.number_input('伝票数/得意先数', step=0.1, key='line_dencnt')
+    denmax = st.number_input('伝票数max', value=0, key='denmax')
+    denrate = st.number_input('伝票数/得意先数', step=0.1, key='denrate')
 
     df_calc2 = df_calc[df_calc['得意先数'] >= line_cust]
     df_calc2 = df_calc2[df_calc2['第2四分位'] >= line_25]
@@ -379,7 +384,8 @@ def overview_now():
     df_calc2 = df_calc2[df_calc2['上位10%'] >= line_90]
     df_calc2 = df_calc2[df_calc2['最大値'] >= line_max]
     df_calc2 = df_calc2[df_calc2['span2575'] >= line_span]
-    df_calc2 = df_calc2[df_calc2['伝票数/得意先数'] >= line_dencnt]
+    df_calc2 = df_calc2[df_calc2['伝票数/max'] >= denmax]
+    df_calc2 = df_calc2[df_calc2['伝票数/得意先数'] >= denrate]
 
     with st.expander('df_calc', expanded=False):
         st.dataframe(df_calc2)
@@ -494,7 +500,9 @@ def cnt_per_cust():
     df_calc[col_name_closing] = round(df_calc['伝票数'] * df_calc['scale_rate'], 1)
     
     df_calc.sort_values(selected_base, ascending=False, inplace=True)
-    st.dataframe(df_calc)
+
+    with st.expander('df_calc', expanded=False):
+        st.dataframe(df_calc)
 
     #足切りライン1
     st.markdown('##### 足切り1: /scale')
@@ -503,7 +511,8 @@ def cnt_per_cust():
         key='foot_cut1')
     
     df_calc2 = df_calc[df_calc[col_name] >= ft_line1]
-    st.dataframe(df_calc2)
+    with st.expander('足切り1', expanded=False):
+        st.dataframe(df_calc2)
 
     #足切りライン2
     st.markdown('##### 足切り2: 伝票数/scale')
@@ -513,17 +522,19 @@ def cnt_per_cust():
     
 
     df_calc2 = df_calc2[df_calc2['伝票数/scale'] >= ft_line2]
-    st.dataframe(df_calc2)
+    with st.expander('足切り2', expanded=False):
+        st.dataframe(df_calc2)
 
     #足切りライン3
-    st.markdown('##### 足切り3: 数量or金額')
+    st.markdown('##### 足切り3: 伝票数')
     ft_line3 = st.number_input(
         'foot_cut_line',
         key='foot_cut3')
     
 
-    df_calc2 = df_calc2[df_calc2[selected_base] >= ft_line3]
-    st.dataframe(df_calc2)
+    df_calc2 = df_calc2[df_calc2['伝票数'] >= ft_line3]
+    with st.expander('足切り3', expanded=False):
+        st.dataframe(df_calc2)
 
     st.markdown('### 深堀/売上スケール調整なし')
     st.markdown('##### 深堀する品番の選択')
@@ -535,7 +546,7 @@ def cnt_per_cust():
     )
     
     #深堀関数
-    slct_cust = fc.fukabori2(hinban, df_now, df_now2, selected_base, graph)
+    fc.fukabori2(hinban, df_now, df_now2, selected_base, graph)
 
 #*****************************************************ピンポイント品番分析
 def pinpoint():
@@ -688,6 +699,30 @@ def pinpoint():
     df_selected = df_nowlast.loc[hinbans]
     graph.make_bar_nowlast(df_selected['偏差値/今期'], df_selected['偏差値/前期'], df_selected.index)
 
+    # st.markdown('##### 順位')
+    # #rank
+    # df_rank_now = df_nowlast['今期'].rank(ascending=False)
+    # df_rank_now = df_rank_now.loc[hinbans]
+    # df_rank_now = df_rank_now.to_frame()
+
+    # st.write(df_rank_now)
+
+    # df_rank_last = df_nowlast['前期'].rank(ascending=False)
+    # df_rank_last = df_rank_last.loc[hinbans]
+    # df_rank_last = df_rank_last.to_frame()
+
+    # df_rankm = df_rank_now.merge(df_rank_last, left_index=True, right_index=True, how='outer')
+    # df_rankm = df_rankm.T
+
+    # lists = []
+    # for col in df_rankm.columns:
+    #     listname = f'df_rankm[{col}]'
+    #     lists.append(listname)
+    
+    # st.write(lists)
+ 
+    # graph.make_line(lists, hinbans, ['今期', '前期'])
+
     col1, col2 = st.columns(2)
     with col1:
         df_rank_now = df_nowlast['今期'].rank(ascending=False)
@@ -807,6 +842,8 @@ def tenji():
 
     df_sum = s_sum.to_frame()
     st.write(df_sum)
+
+    
 
 
     # items = []
@@ -928,6 +965,11 @@ def corr():
     df_corr = df_base.corr()
     st.write(df_corr)
 
+def memo():
+    st.write('絞込みpoint')
+    st.write('第３四分位の設定: 売上の可能性を示す。')
+    st.write('伝票数/得意先数: 1件あたりの回転数を表す')
+
     
     
 
@@ -948,7 +990,8 @@ def main():
         '回転数/アイテム+店舗':cnt_per_cust,
         'ピンポイント品番分析': pinpoint,
         '展示分析': tenji,
-        '相関分析': corr
+        '相関分析': corr,
+        'メモ': memo
           
     }
     selected_app_name = st.sidebar.selectbox(label='分析項目の選択',

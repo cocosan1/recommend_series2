@@ -348,11 +348,14 @@ def make_bunpu(df_now2, selected_base):
     maxs = []
     span2575s = []
     den_cnts = []
+    den_maxs = []
     den_rates = []
+    
     for item in df_now2['品番'].unique():
         items.append(item)
         df_item = df_now2[df_now2['品番']==item]
         s_cust = df_item.groupby('得意先名')[selected_base].sum()
+        S_cust_den = df_item.groupby('得意先名')['伝票番号2'].nunique()
         
         cnt = s_cust.count()
         quan25 = round(s_cust.quantile(0.25), 1)
@@ -362,6 +365,7 @@ def make_bunpu(df_now2, selected_base):
         max_num = s_cust.max()
         span2575 = quan75 - quan25
         den_cnt = df_item['伝票番号2'].nunique()
+        den_max = S_cust_den.max()
         den_rate = round(den_cnt / cnt, 1)
 
         cnts.append(cnt)
@@ -372,12 +376,13 @@ def make_bunpu(df_now2, selected_base):
         maxs.append(max_num)
         span2575s.append(span2575)
         den_cnts.append(den_cnt)
+        den_maxs.append(den_max)
         den_rates.append(den_rate)
 
     df_calc = pd.DataFrame(list(zip(cnts, quan25s, medis, quan75s, quan90s, maxs, span2575s, den_cnts, \
-                                    den_rates)), \
+                                    den_maxs, den_rates)), \
                     columns=['得意先数', '第2四分位', '中央値', '第3四分位', '上位10%', '最大値', 'span2575', \
-                             '伝票数', '伝票数/得意先数'], index=items)
+                             '伝票数', '伝票数/max', '伝票数/得意先数'], index=items)
 
     return df_calc
 
