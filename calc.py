@@ -699,29 +699,23 @@ def pinpoint():
     df_selected = df_nowlast.loc[hinbans]
     graph.make_bar_nowlast(df_selected['偏差値/今期'], df_selected['偏差値/前期'], df_selected.index)
 
-    # st.markdown('##### 順位')
-    # #rank
-    # df_rank_now = df_nowlast['今期'].rank(ascending=False)
-    # df_rank_now = df_rank_now.loc[hinbans]
-    # df_rank_now = df_rank_now.to_frame()
+    st.markdown('##### 順位')
+    #rank
+    df_rank_now = df_nowlast['今期'].rank(ascending=False)
+    df_rank_now = df_rank_now.loc[hinbans]
+    df_rank_now = df_rank_now.to_frame()
 
-    # st.write(df_rank_now)
+    df_rank_last = df_nowlast['前期'].rank(ascending=False)
+    df_rank_last = df_rank_last.loc[hinbans]
+    df_rank_last = df_rank_last.to_frame()
 
-    # df_rank_last = df_nowlast['前期'].rank(ascending=False)
-    # df_rank_last = df_rank_last.loc[hinbans]
-    # df_rank_last = df_rank_last.to_frame()
+    df_rankm = df_rank_last.merge(df_rank_now, left_index=True, right_index=True, how='outer')
+    df_rankm = df_rankm
 
-    # df_rankm = df_rank_now.merge(df_rank_last, left_index=True, right_index=True, how='outer')
-    # df_rankm = df_rankm.T
-
-    # lists = []
-    # for col in df_rankm.columns:
-    #     listname = f'df_rankm[{col}]'
-    #     lists.append(listname)
-    
-    # st.write(lists)
- 
-    # graph.make_line(lists, hinbans, ['今期', '前期'])
+    #リスト化
+    l_rank = df_rankm.values.tolist()
+    #可視化
+    graph.make_line(l_rank, df_rankm.index, ['前期', '今期'])
 
     col1, col2 = st.columns(2)
     with col1:
