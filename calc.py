@@ -1,13 +1,15 @@
 import pandas as pd
 import numpy as np
-from pandas.core.frame import DataFrame
 import streamlit as st
-import plotly.figure_factory as ff
 import plotly.graph_objects as go
 import openpyxl
 import datetime
 
+from sklearn.preprocessing import scale
 from sklearn.preprocessing import StandardScaler
+from scipy.sparse import csr_matrix
+from scipy import spatial
+from sklearn.neighbors import NearestNeighbors
 
 import func_collection as fc
 from func_collection import Graph
@@ -25,8 +27,6 @@ def make_data_now(file):
     df_now['伝票番号2'] = df_now['伝票番号'].apply(lambda x: x[:8])
     df_now['得意先CD2'] = df_now['得意先CD'].apply(lambda x:str(x)[0:5])
     df_now['商品コード2'] = df_now['商品コード'].apply(lambda x: x.split()[0]) #品番
-
-
     df_now['張地'] = df_now['商　品　名'].apply(lambda x: x.split()[2] if len(x.split()) >= 4 else '')
 
     # ***INT型への変更***
@@ -44,7 +44,6 @@ def make_data_last(file):
     df_last['伝票番号2'] = df_last['伝票番号'].apply(lambda x: x[:8])
     df_last['得意先CD2'] = df_last['得意先CD'].apply(lambda x:str(x)[0:5])
     df_last['商品コード2'] = df_last['商品コード'].apply(lambda x: x.split()[0]) #品番
-
     df_last['張地'] = df_last['商　品　名'].apply(lambda x: x.split()[2] if len(x.split()) >= 4 else '')
 
     # ***INT型への変更***
@@ -56,7 +55,7 @@ def make_data_last(file):
 
 # ***ファイルアップロード 今期***
 uploaded_file_now = st.sidebar.file_uploader('今期', type='xlsx', key='now')
-df_now = DataFrame()
+df_now = pd.DataFrame()
 if uploaded_file_now:
     df_now = make_data_now(uploaded_file_now)
 
@@ -71,7 +70,7 @@ else:
 
 # ***ファイルアップロード　前期***
 uploaded_file_last = st.sidebar.file_uploader('前期', type='xlsx', key='last')
-df_last = DataFrame()
+df_last = pd.DataFrame()
 if uploaded_file_last:
     df_last = make_data_last(uploaded_file_last)
 
@@ -581,8 +580,8 @@ def pinpoint():
     #前処理
     df_now2, df_last2 = fc.pre_processing(df_now, df_last, selected_base, selected_cate)
 
-    s_now2g = df_now2.groupby('品番')[selected_base].sum()
-    s_last2g = df_last2.groupby('品番')[selected_base].sum()
+    s_now2g = df_now2.groupby('商品コード2')[selected_base].sum()
+    s_last2g = df_last2.groupby('商品コード2')[selected_base].sum()
     
     df_now2['受注年月'] = df_now2['受注日'].dt.strftime("%Y-%m")
     df_now2['受注年月'] = pd.to_datetime(df_now2['受注年月'])
@@ -620,7 +619,7 @@ def pinpoint():
     den_rates = []
     for item in hinbans:
         items.append(item)
-        df_item = df_now2[df_now2['品番']==item]
+        df_item = df_now2[df_now2['商品コード2']==item]
         s_cust = df_item.groupby('得意先名')[selected_base].sum()
         
         cnt = s_cust.count()
@@ -736,11 +735,11 @@ def pinpoint():
     # #可視化
     st.markdown('##### 数量の分布/箱ひげ')
 
-    df_hinban_now = df_now2[df_now2['品番'].isin(hinbans)]
+    df_hinban_now = df_now2[df_now2['商品コード2'].isin(hinbans)]
 
     fig = go.Figure()
     for hinban in hinbans:
-        df = df_hinban_now[df_hinban_now['品番']==hinban]
+        df = df_hinban_now[df_hinban_now['商品コード2']==hinban]
         s_now = df.groupby('得意先名')[selected_base].sum()
 
         fig.add_trace(go.Box(y=s_now, name=hinban))
@@ -771,7 +770,7 @@ def pinpoint():
 
 ###########################################################################################展示分析
 def tenji():
-    st.markdown('### 展示分析')
+    st.markdown('### 展示分析/売上調整')
 
     selected_base = st.selectbox(
             '分析ベース選択',
@@ -819,135 +818,187 @@ def tenji():
         st.info('得意先を選択してください')
         st.stop()
     
-    ###############################データスケール調整
-     #数量データ分布一覧/itemベース
-
-    #想定売上設定
-    assumption = st.number_input(
-        '想定年間売上',
-        value=10000000,
-        key='tenji_assumption'
-    )
-
-
-    #店別合計金額の算出
-    s_sum = df_now.groupby('得意先名')[selected_base].sum()
-    s_sum.rename('合計',inplace=True)
-
-    df_sum = s_sum.to_frame()
-    st.write(df_sum)
-
+    if cust_name != '--得意先を選択--':
     
+        #店別合計金額の算出
+        s_sum = df_now.groupby('得意先名')['金額'].sum()
+        # s_sum.rename('合計',inplace=True)
+        df_sum = s_sum.to_frame()
+
+        # #scale調整
+        # df_sum['scale_rate'] = assumption / df_sum['金額']
+
+        items = []
+
+        df_base = pd.DataFrame(index=df_now2['得意先名'].unique())
+        for item in df_now2['商品コード2'].unique():
+            items.append(item)
+            df_item = df_now2[df_now2['商品コード2']==item]
+            s_cust = df_item.groupby('得意先名')['金額'].sum()
+            df = pd.DataFrame(s_cust)
+            df.rename(columns={'金額': item}, inplace=True)
+            df_base = df_base.merge(df, left_index=True, right_index=True, how='left')
+        
+        df_base = df_base.fillna(0)
+
+        df_basem = df_base.merge(df_sum, left_index=True, right_index=True, how='left')
+
+        with st.expander('df_basem', expanded=False):
+            st.dataframe(df_basem)
 
 
-    # items = []
+        #偏差値化
+        df_deviation = pd.DataFrame(index=df_basem.index)
+        for item in df_basem.columns[:-1]:
+            df = df_basem[item]
+            #販売した得意先だけで集計する
+            df = df[df > 0]
+            #標準偏差 母分散・母標準偏差ddof=0
+            df_std = df.std(ddof=0)
+            #平均値
+            df_mean = df.mean()
+            #偏差値
+            df_deviation[item] = (((df_basem[item] - df_mean) / df_std) * 10 + 50)
+            df_deviation.replace([np.inf, -np.inf, np.nan], 0, inplace=True)
+            #np.infは正の無限大、-np.infは負の無限大、np.nanは欠損値
+            df_deviation = df_deviation.round(1)
+        
+        with st.expander('df_deviation', expanded=False):
+            st.write(df_deviation)
+        
+        #得意先に絞ったseries
+        s_cust_std = df_deviation.loc[cust_name]
 
-    # df_base = pd.DataFrame(index=df_now2['得意先名'].unique())
-    # for item in df_now2['品番'].unique():
-    #     items.append(item)
-    #     df_item = df_now2[df_now2['品番']==item]
-    #     s_cust = df_item.groupby('得意先名')['金額'].sum()
-    #     df = pd.DataFrame(s_cust)
-    #     df.rename(columns={'金額': item}, inplace=True)
-    #     df_base = df_base.merge(df, left_index=True, right_index=True, how='left')
+        #売上のあるitemのみに絞込み
+        df_cust = df_basem.loc[cust_name].T
+        df_cust = df_cust[df_cust > 0]
+
+        items = list(df_cust.index[:-1]) #金額削除
+        
+        s_cust_std = s_cust_std.loc[items]
+
+        st.markdown('##### 偏差値/売っている店の中で算出')
+        with st.expander('s_cust_std', expanded=False):
+            st.dataframe(s_cust_std)
+        
+
+        s_cust_std.sort_values(ascending=False, inplace=True)
+        #可視化
+        st.markdown('##### 販売商品/偏差値')
+        graph.make_bar(s_cust_std, s_cust_std.index)
+
+        st.markdown('##### 売上合計偏差値')
+        df_sum2 = df_sum[:-1]
+
+        #偏差値化
+        df_deviation2 = pd.DataFrame(index=df_sum2.index)
+
+        #標準偏差 母分散・母標準偏差ddof=0
+        s_std2 = df_sum2.std(ddof=0)
+
+        #平均値
+        s_mean2 = df_sum2.mean()
+
+        #偏差値
+        df_deviation2['偏差値'] = ((df_sum2 - s_mean2) / s_std2 * 10 + 50)
+        df_deviation2.replace([np.inf, -np.inf, np.nan], 0, inplace=True)
+        df_deviation2 = df_deviation2.round(1)
+
+        df_sum2.sort_values('金額', ascending=False, inplace=True)
+        df_deviation2.sort_values('偏差値', ascending=False, inplace=True)
+
+        with st.expander('s_sum2', expanded=False):
+            st.write(df_sum2)
+        with st.expander('s_deviation2', expanded=False):
+            st.write(df_deviation2)
+        
+        cust_dev = df_deviation2.loc[cust_name]
+        st.write('■ 偏差値: 売上/全国')
+        st.write(cust_dev)
+
+        #全国順位
+        st.write('■ 順位/全国')
+        st.write(f'全国得意先数: {len(df_sum2)}')
+        st.write(f'順位: {df_sum2.index.get_loc(cust_name) + 1}')
+        st.write(f'売上: {df_sum2.loc[cust_name]["金額"]}')
     
-    # df_base = df_base.fillna(0)
+        # #**********************************************************************アイテムベース
+        # #**************************************************最近傍探索
+        
+        # st.markdown('### レコメンド/アイテムベース')
 
-    # #df_baseと合計のmerge
-    # df_base = pd.merge(df_base, s_sum.to_frame(), left_index=True, right_index=True, how='outer')
-    # with st.expander('df_base', expanded=False):
-    #     st.dataframe(df_base)
+        # df_nowbase = pd.DataFrame(index=df_now['得意先名'].unique())
+        # for item in df_now['商品コード2'].unique():
+        #     items.append(item)
+        #     df_item = df_now[df_now['商品コード2']==item]
+        #     s_cust = df_item.groupby('得意先名')['数量'].sum()
+        #     df = pd.DataFrame(s_cust)
+        #     df.rename(columns={'数量': item}, inplace=True)
+        #     df_nowbase = df_nowbase.merge(df, left_index=True, right_index=True, how='left')
+        #     df_nowbase = df_nowbase.fillna(0)
+        
+        # with st.expander('df_nowbase', expanded=False):
+        #     st.dataframe(df_nowbase)
+        
+        # df_target = df_nowbase[df_nowbase.index == cust_name]
+
+        # #疎行列（ほとんどが0の行列）アイテム/ユーザー行列
+        # #dfをアイテム列だけに絞る
+        # df_target = df_target.fillna(0)
+
+        # with st.expander('index target/col item/df 横長: df_target'):
+        #     st.write(df_target)
+        
+        # #最近傍探索の準備
+        # df_nowbaset = df_nowbase.T #index:商品/col:得意先
+        # with st.expander('index item/col item df_nowbaset', expanded=False):
+        #     st.write(df_nowbaset)
+        
+        # #標準化
+        # df_nowbaset_std = scale(df_nowbaset, axis=1)
+        # #indexを追加
+        # df_nowbaset_std = pd.DataFrame(df_nowbaset_std, index=df_nowbaset.index)
+        # with st.expander('df_nowbaset_std', expanded=False):
+        #     st.write(df_nowbaset_std)
+
+        # #アイテム同士の距離の計算
+        # def distance(itemname_a, itemname_b):
+        #     a = df_nowbaset_std.loc[itemname_a]
+        #     list_a = list(a)
+
+        #     b = df_nowbaset_std.loc[itemname_b]
+        #     list_b = list(b)
+
+        #     list_dist = spatial.distance.cosine(list_a, list_b)
+
+        #     return list_dist
+        
+        # #近いアイテムの抽出
+        # def get_neighbors(item_name):
+        #     dist_dict = {}
+        #     for item in df_nowbaset_std.index:
+        #         if (item != item_name):
+        #             dist = distance(item_name, item)
+        #             dist_dict[item] = dist
+                
+                    
+        #     df = pd.DataFrame(dist_dict, index=['distance']).T
+        #     df = df[df['distance'] < 0.45]
+        #     df = df.sort_values('distance', ascending=True)
+
+        #     return df
     
-    
-
-    # #スケール調整用の比率算出
-    # cust_dict = {}
-    # #計算用に転置
-    # df_baset = df_base.T
-    # df_scale = pd.DataFrame()
-    # for cust in df_baset.columns:
-    #     sum_cust = df_baset[cust].sum()
-    #     scale_rate = assumption / sum_cust
-    #     df_scale[cust] = round(df_baset[cust] * scale_rate)
-    
-    # with st.expander('df_scale', expanded=False):
-    #     st.dataframe(df_scale)
-    
-    # #転置 index得意先/col品番
-    # df_scalet = df_scale.T
-    # df_scalet.fillna(0, inplace=True)
+        
+        # df_neigh = pd.DataFrame()
+        # for item_name in s_cust_std.index:
+        #     df = get_neighbors(item_name)
+        #     df = df.rename(columns={'distance': item_name})
+        #     df_neigh = df_neigh.merge(df, left_index=True, right_index=True, how='outer')
+        # st.write(df_neigh)   
 
 
-    # #偏差値化
-    # df_deviation = pd.DataFrame(index=df_scalet.index)
-    # for item in df_scalet.columns:
-    #     df = df_scalet[item]
-    #     #販売した得意先だけで集計する
-    #     df = df[df > 0]
-    #     #標準偏差 母分散・母標準偏差ddof=0
-    #     df_std = df.std(ddof=0)
-    #     #平均値
-    #     df_mean = df.mean()
-    #     #偏差値
-    #     df_deviation[item] = ((df_scalet[item] - df_mean) / df_std * 10 + 50)
-    #     df_deviation.replace([np.inf, -np.inf, np.nan], 0, inplace=True)
-    #     df_deviation = df_deviation.round(1)
-    
-    # #得意先に絞ったseries
-    # s_cust_std = df_deviation.loc[cust_name]
 
-    # with st.expander('df_cust_std', expanded=False):
-    #     st.dataframe(s_cust_std)
-    
-    # #得意先の売上が0のitem行を削除
-    # df_non0 = df_scale[df_scale[cust_name] != 0]
-    # non0s = df_non0.index
 
-    # s_cust_std = s_cust_std.loc[non0s]
-
-    # s_cust_std.sort_values(ascending=False, inplace=True)
-    # #可視化
-    # st.markdown('##### 販売商品/偏差値')
-    # graph.make_bar(s_cust_std, s_cust_std.index)
-
-    # st.write('売上合計偏差値')
-    # #index得意先col売上のseries
-    # zenkoku_dict = {}
-    # for cust in df_zenkoku.columns:
-    #     cust_sum = df_zenkoku[cust].sum()
-    #     zenkoku_dict[cust] = cust_sum
-
-    # df_sales = pd.DataFrame(zenkoku_dict, index=['売上']).T
-
-    # #偏差値化
-    # df_deviation2 = pd.DataFrame(index=df_sales.index)
-
-    # #標準偏差 母分散・母標準偏差ddof=0
-    # s_std2 = df_sales.std(ddof=0)
-
-    # #平均値
-    # s_mean2 = df_sales.mean()
-
-    # #偏差値
-    # df_deviation2['偏差値'] = ((df_sales - s_mean2) / s_std2 * 10 + 50)
-    # df_deviation2.replace([np.inf, -np.inf, np.nan], 0, inplace=True)
-    # df_deviation2 = df_deviation2.round(1)
-    # df_sales.sort_values('売上', ascending=False, inplace=True)
-    # df_deviation2.sort_values('偏差値', ascending=False, inplace=True)
-
-    # with st.expander('s_sales', expanded=False):
-    #     st.write(df_sales)
-    # with st.expander('s_deviation2', expanded=False):
-    #     st.write(df_deviation2)
-    
-    # cust_dev = df_deviation2.loc[cust_name]
-    # st.write('■ 偏差値: 売上/全国')
-    # st.write(cust_dev)
-
-    # #全国順位
-    # st.write('■ 順位/全国')
-    # st.write(f'全国得意先数: {len(df_sales)}')
-    # st.write(f'順位: {df_sales.index.get_loc(cust_name) + 1}')
 
 def corr():
     st.markdown('### 相関分析')

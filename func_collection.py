@@ -310,6 +310,9 @@ def pre_processing(df_now, df_last, selected_base, selected_cate):
         df_now2['品番'] = df_now2['商　品　名'].apply(lambda x: x.split(' ')[0])
         df_last2['品番'] = df_last2['商　品　名'].apply(lambda x: x.split(' ')[0])
 
+        df_now2['商品コード2'] = df_now2['商品コード'].apply(lambda x: x.split()[0]) #品番
+        df_last2['商品コード2'] = df_last2['商品コード'].apply(lambda x: x.split()[0]) 
+
         df_now2[selected_base] = df_now2[selected_base].fillna(0)
         df_last2[selected_base] = df_last2[selected_base].fillna(0)
 
