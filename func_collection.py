@@ -307,20 +307,20 @@ def pre_processing(df_now, df_last, selected_base, selected_cate):
         df_now2 = df_lnow[~df_lnow['商　品　名'].str.contains(exclude_pattern, regex=True)]
         df_last2 = df_llast[~df_llast['商　品　名'].str.contains(exclude_pattern, regex=True)]
 
-        df_now2['品番'] = df_now2['商　品　名'].apply(lambda x: x.split(' ')[0])
-        df_last2['品番'] = df_last2['商　品　名'].apply(lambda x: x.split(' ')[0])
+        df_now2.loc[:, '品番'] = df_now2['商　品　名'].apply(lambda x: x.split(' ')[0]).copy()
+        df_last2.loc[:, '品番'] = df_last2['商　品　名'].apply(lambda x: x.split(' ')[0]).copy()
 
-        df_now2['商品コード2'] = df_now2['商品コード'].apply(lambda x: x.split()[0]) #品番
-        df_last2['商品コード2'] = df_last2['商品コード'].apply(lambda x: x.split()[0]) 
+        df_now2.loc[:, '商品コード2'] = df_now2['商品コード'].apply(lambda x: x.split()[0]).copy() #品番
+        df_last2.loc[:, '商品コード2'] = df_last2['商品コード'].apply(lambda x: x.split()[0]).copy() 
 
-        df_now2[selected_base] = df_now2[selected_base].fillna(0)
-        df_last2[selected_base] = df_last2[selected_base].fillna(0)
+        df_now2.loc[:, selected_base] = df_now2[selected_base].fillna(0).copy()
+        df_last2.loc[:, selected_base] = df_last2[selected_base].fillna(0).copy()
 
-        df_now2['受注年月'] = df_now2['受注日'].dt.strftime("%Y-%m")
-        df_now2['受注年月'] = pd.to_datetime(df_now2['受注年月'])
+        df_now2.loc[:, '受注年月'] = df_now2['受注日'].dt.strftime("%Y-%m").copy()
+        df_now2.loc[:, '受注年月'] = pd.to_datetime(df_now2['受注年月']).copy()
 
-        df_last2['受注年月'] = df_last2['受注日'].dt.strftime("%Y-%m")
-        df_last2['受注年月'] = pd.to_datetime(df_last2['受注年月'])
+        df_last2.loc[:, '受注年月'] = df_last2['受注日'].dt.strftime("%Y-%m").copy()
+        df_last2.loc[:, '受注年月'] = pd.to_datetime(df_last2['受注年月']).copy()
 
     else:
         df_now2 = df_now[df_now['商品分類名2']==selected_cate]

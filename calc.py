@@ -64,6 +64,7 @@ if uploaded_file_now:
     date_end =df_now['受注日'].max()
     st.sidebar.caption(f'{date_start} - {date_end}')
 
+
 else:
     st.info('今期のファイルを選択してください。')
 
@@ -82,6 +83,60 @@ if uploaded_file_last:
 else:
     st.info('前期のファイルを選択してください。')
     st.stop()
+
+################################得意先絞り込み
+
+selected_span = st.selectbox(
+    '売上レンジを指定',
+    ['全得意先', '500万未満', '500万-1000万', '1000万-1500万', '1500万-2000万', '2000万以上'],
+    key='range')
+
+#得意先ごとに金額を合計
+s_now = df_now.groupby('得意先名')['金額'].sum()
+
+#得意先を売上レンジで絞る関数
+def select_df(index_list):
+    df_now_span = df_now[df_now['得意先名'].isin(index_list)]
+    df_last_span = df_last[df_last['得意先名'].isin(index_list)]
+
+    return df_now_span, df_last_span
+
+df_now_span = pd.DataFrame()
+df_last_span = pd.DataFrame()
+
+if selected_span == '全得意先':
+    df_now_span = df_now.copy()
+    df_last_span = df_last.copy()
+
+elif selected_span == '500万未満':
+    s_now_selected = s_now[(s_now >= 0) & (s_now < 5000000)]
+    index_list = s_now_selected.index
+
+    df_now_span, df_last_span = select_df(index_list)
+    
+elif selected_span == '500万-1000万':
+    s_now_selected = s_now[(s_now >= 5000000) & (s_now < 10000000)]
+    index_list = s_now_selected.index
+    
+    df_now_span, df_last_span = select_df(index_list)
+
+elif selected_span == '1000万-1500万':
+    s_now_selected = s_now[(s_now >= 10000000) & (s_now < 15000000)]
+    index_list = s_now_selected.index
+    
+    df_now_span, df_last_span = select_df(index_list)
+
+elif selected_span == '1500万-2000万':
+    s_now_selected = s_now[(s_now >= 15000000) & (s_now < 20000000)]
+    index_list = s_now_selected.index
+    
+    df_now_span, df_last_span = select_df(index_list)
+
+elif selected_span == '2000万以上':
+    s_now_selected = s_now[(s_now >= 20000000)]
+    index_list = s_now_selected.index
+    
+    df_now_span, df_last_span = select_df(index_list)
 
 #*****************************************************graphインスタンス
 graph = Graph()
@@ -104,7 +159,7 @@ def overview():
     )
 
     #前処理
-    df_now2, df_last2 = fc.pre_processing(df_now, df_last, selected_base, selected_cate)
+    df_now2, df_last2 = fc.pre_processing(df_now_span, df_last_span, selected_base, selected_cate)
 
     s_now2g = df_now2.groupby('品番')[selected_base].sum()
     s_last2g = df_last2.groupby('品番')[selected_base].sum()
@@ -334,7 +389,7 @@ def overview_now():
     )
 
     #前処理
-    df_now2, df_last2 = fc.pre_processing(df_now, df_last, selected_base, selected_cate)
+    df_now2, df_last2 = fc.pre_processing(df_now_span, df_last_span, selected_base, selected_cate)
 
     s_now2g = df_now2.groupby('品番')[selected_base].sum()
     s_last2g = df_last2.groupby('品番')[selected_base].sum()
@@ -477,7 +532,7 @@ def cnt_per_cust():
     
     
     #前処理
-    df_now2, df_last2 = fc.pre_processing(df_now, df_last, selected_base, selected_cate)
+    df_now2, df_last2 = fc.pre_processing(df_now_span, df_last_span, selected_base, selected_cate)
     
     # df_now2['受注年月'] = df_now2['受注日'].dt.strftime("%Y-%m")
     # df_now2['受注年月'] = pd.to_datetime(df_now2['受注年月'])
@@ -578,7 +633,7 @@ def pinpoint():
     )
 
     #前処理
-    df_now2, df_last2 = fc.pre_processing(df_now, df_last, selected_base, selected_cate)
+    df_now2, df_last2 = fc.pre_processing(df_now_span, df_last_span, selected_base, selected_cate)
 
     s_now2g = df_now2.groupby('商品コード2')[selected_base].sum()
     s_last2g = df_last2.groupby('商品コード2')[selected_base].sum()
@@ -786,7 +841,7 @@ def tenji():
     )
 
     #前処理
-    df_now2, df_last2 = fc.pre_processing(df_now, df_last, selected_base, selected_cate)
+    df_now2, df_last2 = fc.pre_processing(df_now_span, df_last_span, selected_base, selected_cate)
 
     s_now2g = df_now2.groupby('品番')[selected_base].sum()
     s_last2g = df_last2.groupby('品番')[selected_base].sum()
