@@ -85,6 +85,25 @@ else:
     st.stop()
 
 ################################得意先絞り込み
+############################年換算
+date_min = df_now['受注日'].min()
+date_max = df_now['受注日'].max()
+date_span = (date_max - date_min).days
+date_rate = 365 / date_span
+
+df_now_year = df_now.copy()
+df_last_year = df_last.copy()
+
+df_now_year['数量'] = df_now_year['数量'] * date_rate
+df_last_year['数量'] = df_last_year['数量'] * date_rate
+df_now_year['金額'] = df_now_year['金額'] * date_rate
+df_last_year['金額'] = df_last_year['金額'] * date_rate
+
+#小数点以下1桁
+df_now_year['数量'] = df_now_year['数量'].round(1)
+df_last_year['数量'] = df_last_year['数量'].round(1)
+df_now_year['金額'] = df_now_year['金額'].round(1)
+df_last_year['金額'] = df_last_year['金額'].round(1)
 
 selected_span = st.selectbox(
     '売上レンジを指定',
@@ -92,12 +111,12 @@ selected_span = st.selectbox(
     key='range')
 
 #得意先ごとに金額を合計
-s_now = df_now.groupby('得意先名')['金額'].sum()
+s_now = df_now_year.groupby('得意先名')['金額'].sum()
 
 #得意先を売上レンジで絞る関数
 def select_df(index_list):
-    df_now_span = df_now[df_now['得意先名'].isin(index_list)]
-    df_last_span = df_last[df_last['得意先名'].isin(index_list)]
+    df_now_span = df_now_year[df_now_year['得意先名'].isin(index_list)]
+    df_last_span = df_last_year[df_last_year['得意先名'].isin(index_list)]
 
     return df_now_span, df_last_span
 
@@ -366,20 +385,6 @@ def overview_now():
         key='ov_sbase'
     )
 
-    #年換算
-    date_min = df_now['受注日'].min()
-    date_max = df_now['受注日'].max()
-    date_span = (date_max - date_min).days
-    date_rate = 365 / date_span
-
-    df_now_year = df_now.copy()
-    df_last_year = df_last.copy()
-    df_now_year[selected_base] = df_now[selected_base] * date_rate
-    df_last_year[selected_base] = df_last[selected_base] * date_rate
-    df_now_year[selected_base] = df_now_year[selected_base].astype('int')
-    df_last_year[selected_base] = df_last_year[selected_base].astype('int')
-
-
 
     cate_list = ['リビングチェア', 'ダイニングチェア', 'ダイニングテーブル', 'リビングテーブル', 'キャビネット類']
     selected_cate = st.selectbox(
@@ -486,121 +491,121 @@ def overview_now():
         st.plotly_chart(fig, use_container_width=True) 
         #plotly_chart plotlyを使ってグラグ描画　グラフの幅が列の幅
     
+    st.write('年換算/得意先絞り込み')
+    fc.fukabori3(df_now_span, df_last_span, selected_base, selected_cate, graph)
 
-    fc.fukabori3(df_now, df_last, selected_base, selected_cate, graph)
 
+# #*****************************************************数量ランキング/購入した得意先＋アイテム　スケール調整
 
-#*****************************************************数量ランキング/購入した得意先＋アイテム　スケール調整
+# def cnt_per_cust():
+#     st.markdown('### 数量ランキング/購入した得意先＋アイテム')
+#     st.write('スケール調整 1000万円')
 
-def cnt_per_cust():
-    st.markdown('### 数量ランキング/購入した得意先＋アイテム')
-    st.write('スケール調整 1000万円')
+#     selected_base = st.selectbox(
+#         '分析ベース選択',
+#         ['数量', '金額'],
+#         key='ov_sbase'
+#     )
 
-    selected_base = st.selectbox(
-        '分析ベース選択',
-        ['数量', '金額'],
-        key='ov_sbase'
-    )
+#     cate_list = ['リビングチェア', 'ダイニングチェア', 'ダイニングテーブル', 'リビングテーブル', 'キャビネット類']
+#     selected_cate = st.selectbox(
+#         '商品分類',
+#         cate_list,
+#         key='cl'
+#     )
 
-    cate_list = ['リビングチェア', 'ダイニングチェア', 'ダイニングテーブル', 'リビングテーブル', 'キャビネット類']
-    selected_cate = st.selectbox(
-        '商品分類',
-        cate_list,
-        key='cl'
-    )
+#     assumption = st.number_input(
+#         '想定年間売上',
+#         value=10000000,
+#         key='assumption'
+#     )
 
-    assumption = st.number_input(
-        '想定年間売上',
-        value=10000000,
-        key='assumption'
-    )
+#     #スケール調整用の比率算出
+#     #今期
+#     cust_dict_now = {}
 
-    #スケール調整用の比率算出
-    #今期
-    cust_dict_now = {}
-
-    for cust in df_now['得意先名'].unique():
-        sum_cust = df_now[df_now['得意先名']==cust]['金額'].sum()
-        if sum_cust == 0:
-            scale_rate = 0
-        else:
-            scale_rate = assumption / sum_cust
-        cust_dict_now[cust] = scale_rate
+#     for cust in df_now['得意先名'].unique():
+#         sum_cust = df_now[df_now['得意先名']==cust]['金額'].sum()
+#         if sum_cust == 0:
+#             scale_rate = 0
+#         else:
+#             scale_rate = assumption / sum_cust
+#         cust_dict_now[cust] = scale_rate
         
     
-    df_scale = pd.DataFrame(cust_dict_now, index= ['scale_rate']).T
+#     df_scale = pd.DataFrame(cust_dict_now, index= ['scale_rate']).T
     
     
-    #前処理
-    df_now2, df_last2 = fc.pre_processing(df_now_span, df_last_span, selected_base, selected_cate)
+#     #前処理
+#     df_now2, df_last2 = fc.pre_processing(df_now_span, df_last_span, selected_base, selected_cate)
     
-    # df_now2['受注年月'] = df_now2['受注日'].dt.strftime("%Y-%m")
-    # df_now2['受注年月'] = pd.to_datetime(df_now2['受注年月'])
+#     # df_now2['受注年月'] = df_now2['受注日'].dt.strftime("%Y-%m")
+#     # df_now2['受注年月'] = pd.to_datetime(df_now2['受注年月'])
     
     
-    #グループ化
-    df_calc = df_now2.groupby(['商品コード2', '得意先名'], as_index=False)[selected_base].sum()
-    df_closing = df_now2.groupby(['商品コード2', '得意先名'], as_index=False)['伝票番号2'].count()
+#     #グループ化
+#     df_calc = df_now2.groupby(['商品コード2', '得意先名'], as_index=False)[selected_base].sum()
+#     df_closing = df_now2.groupby(['商品コード2', '得意先名'], as_index=False)['伝票番号2'].count()
 
-    df_calc =df_calc.merge(df_scale, left_on='得意先名', right_index=True, how='left')
+#     df_calc =df_calc.merge(df_scale, left_on='得意先名', right_index=True, how='left')
 
-    col_name = f'{selected_base}/scale'
-    df_calc[col_name] = round(df_calc[selected_base] * df_calc['scale_rate'], 1)
+#     col_name = f'{selected_base}/scale'
+#     df_calc[col_name] = round(df_calc[selected_base] * df_calc['scale_rate'], 1)
 
-    df_calc = df_calc.merge(df_closing, on=['商品コード2', '得意先名'], how='left')
-    df_calc.rename(columns={'伝票番号2': '伝票数'}, inplace=True)
+#     df_calc = df_calc.merge(df_closing, on=['商品コード2', '得意先名'], how='left')
+#     df_calc.rename(columns={'伝票番号2': '伝票数'}, inplace=True)
 
-    col_name_closing = f'伝票数/scale'
-    df_calc[col_name_closing] = round(df_calc['伝票数'] * df_calc['scale_rate'], 1)
+#     col_name_closing = f'伝票数/scale'
+#     df_calc[col_name_closing] = round(df_calc['伝票数'] * df_calc['scale_rate'], 1)
     
-    df_calc.sort_values(selected_base, ascending=False, inplace=True)
+#     df_calc.sort_values(selected_base, ascending=False, inplace=True)
 
-    with st.expander('df_calc', expanded=False):
-        st.dataframe(df_calc)
+#     with st.expander('df_calc', expanded=False):
+#         st.dataframe(df_calc)
 
-    #足切りライン1
-    st.markdown('##### 足切り1: /scale')
-    ft_line1 = st.number_input(
-        'foot_cut_line',
-        key='foot_cut1')
+#     #足切りライン1
+#     st.markdown('##### 足切り1: /scale')
+#     ft_line1 = st.number_input(
+#         'foot_cut_line',
+#         key='foot_cut1')
     
-    df_calc2 = df_calc[df_calc[col_name] >= ft_line1]
-    with st.expander('足切り1', expanded=False):
-        st.dataframe(df_calc2)
+#     df_calc2 = df_calc[df_calc[col_name] >= ft_line1]
+#     with st.expander('足切り1', expanded=False):
+#         st.dataframe(df_calc2)
 
-    #足切りライン2
-    st.markdown('##### 足切り2: 伝票数/scale')
-    ft_line2 = st.number_input(
-        'foot_cut_line',
-        key='foot_cut2')
-    
-
-    df_calc2 = df_calc2[df_calc2['伝票数/scale'] >= ft_line2]
-    with st.expander('足切り2', expanded=False):
-        st.dataframe(df_calc2)
-
-    #足切りライン3
-    st.markdown('##### 足切り3: 伝票数')
-    ft_line3 = st.number_input(
-        'foot_cut_line',
-        key='foot_cut3')
+#     #足切りライン2
+#     st.markdown('##### 足切り2: 伝票数/scale')
+#     ft_line2 = st.number_input(
+#         'foot_cut_line',
+#         key='foot_cut2')
     
 
-    df_calc2 = df_calc2[df_calc2['伝票数'] >= ft_line3]
-    with st.expander('足切り3', expanded=False):
-        st.dataframe(df_calc2)
+#     df_calc2 = df_calc2[df_calc2['伝票数/scale'] >= ft_line2]
+#     with st.expander('足切り2', expanded=False):
+#         st.dataframe(df_calc2)
 
-    st.markdown('### 深堀/売上スケール調整なし')
-    st.markdown('##### 深堀する品番の選択')
-    hinbans = sorted(list(df_calc2['商品コード2'].unique()))
-    hinban = st.selectbox(
-        '品番の選択',
-        hinbans,
-        key='hinban'
-    )
+#     #足切りライン3
+#     st.markdown('##### 足切り3: 伝票数')
+#     ft_line3 = st.number_input(
+#         'foot_cut_line',
+#         key='foot_cut3')
     
-    #深堀関数
-    fc.fukabori2(hinban, df_now, df_now2, selected_base, graph)
+
+#     df_calc2 = df_calc2[df_calc2['伝票数'] >= ft_line3]
+#     with st.expander('足切り3', expanded=False):
+#         st.dataframe(df_calc2)
+
+#     st.markdown('### 深堀/売上スケール調整なし')
+#     st.markdown('##### 深堀する品番の選択')
+#     hinbans = sorted(list(df_calc2['商品コード2'].unique()))
+#     hinban = st.selectbox(
+#         '品番の選択',
+#         hinbans,
+#         key='hinban'
+#     )
+    
+#     #深堀関数
+#     fc.fukabori2(hinban, df_now, df_now2, selected_base, graph)
 
 #*****************************************************ピンポイント品番分析
 def pinpoint():
@@ -825,6 +830,8 @@ def pinpoint():
 
 ###########################################################################################展示分析
 def tenji():
+    st.title('店舗展示分析')
+    st.write('年換算処理')
     st.markdown('### 展示分析/売上調整')
 
     selected_base = st.selectbox(
@@ -851,6 +858,7 @@ def tenji():
 
     
     ########################得意先の選択
+  
     st.markdown('####  得意先の選択')
     cust_text = st.text_input('得意先名の一部を入力 例）ケンポ')
 
@@ -876,7 +884,7 @@ def tenji():
     if cust_name != '--得意先を選択--':
     
         #店別合計金額の算出
-        s_sum = df_now.groupby('得意先名')['金額'].sum()
+        s_sum = df_now_span.groupby('得意先名')['金額'].sum()
         # s_sum.rename('合計',inplace=True)
         df_sum = s_sum.to_frame()
 
@@ -1059,7 +1067,7 @@ def corr():
     st.markdown('### 相関分析')
 
     with st.expander('df_base', expanded=False):
-        df_base = fc.make_data_corr(df_now)
+        df_base = fc.make_data_corr(df_now_span)
         st.write(df_base)
 
     df_corr = df_base.corr()
@@ -1087,7 +1095,7 @@ def main():
         '-': None,
         'アイテム別概要/前年比': overview,
         'アイテム別概要/今期 複数グラフ': overview_now,
-        '回転数/アイテム+店舗':cnt_per_cust,
+        # '回転数/アイテム+店舗':cnt_per_cust,
         'ピンポイント品番分析': pinpoint,
         '展示分析': tenji,
         '相関分析': corr,
