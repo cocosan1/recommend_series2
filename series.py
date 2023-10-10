@@ -1,14 +1,18 @@
 import pandas as pd
 import numpy as np
 import streamlit as st
+import plotly.graph_objects as go
 import openpyxl
 import datetime
+
+from sklearn.decomposition import PCA #主成分分析
+from sklearn.preprocessing import StandardScaler #標準化
 
 import func_collection as fc
 from func_collection import Graph
 
-st.set_page_config(page_title='アイテム売上予測')
-st.markdown('## アイテム売上予測')
+st.set_page_config(page_title='得意先分析')
+st.markdown('## 得意先分析2 シリーズ別')
 
 #*******************************************************************************データ取り込み＋加工
 @st.cache_data(ttl=datetime.timedelta(hours=1))
@@ -43,7 +47,7 @@ def make_data_last(file):
     df_last[['数量', '金額', '原価金額']] = df_last[['数量', '金額', '原価金額']].fillna(0).astype('int64')
     #fillna　０で空欄を埋める
 
-    return df_last        
+    return df_last     
 
 
 # ***ファイルアップロード 今期***
@@ -56,7 +60,6 @@ if uploaded_file_now:
     date_start =df_now['受注日'].min()
     date_end =df_now['受注日'].max()
     st.sidebar.caption(f'{date_start} - {date_end}')
-
 
 else:
     st.info('今期のファイルを選択してください。')
@@ -150,91 +153,98 @@ elif selected_span == '2000万以上':
     
     df_now_span, df_last_span = select_df(index_list)
 
-st.write(f'【得意先数】 {df_now_span["得意先名"].nunique()}')
 
-def pred_itemsales():
-    st.markdown('### アイテム概要/年換算')
+#*****************************************************graphインスタンス
+graph = Graph()
 
-    selected_base = st.selectbox(
-        '分析ベース選択',
-        ['数量', '金額'],
-        key='ov_sbase'
-    )
+#**********************************************************商品別概要 前年比
+
+st.markdown('### アイテム概要')
+
+selected_base = st.selectbox(
+    '分析ベース選択',
+    ['数量', '金額'],
+    key='ov_sbase'
+)
+
+cate_list = ['リビングチェア', 'ダイニングチェア', 'ダイニングテーブル', 'リビングテーブル', 'キャビネット類']
+selected_cate = st.selectbox(
+    '商品分類',
+    cate_list,
+    key='cl'
+)
+
+#前処理
+df_now2, df_last2 = fc.pre_processing(df_now_span, df_last_span, selected_base, selected_cate)
+
+series_name = st.selectbox('シリーズ名', df_now2['シリーズ名'].unique(), key='series_name')
+
+df_now2_selected = df_now2[df_now2['シリーズ名']==series_name]
+
+s_cust_product = df_now2_selected.groupby('得意先名')[selected_base].sum()
+
+st.write(s_cust_product)
 
 
-    cate_list = ['リビングチェア', 'ダイニングチェア', 'ダイニングテーブル', 'リビングテーブル', 'キャビネット類']
-    selected_cate = st.selectbox(
-        '商品分類',
-        cate_list,
-        key='cl'
-    )
 
-    #前処理
-    df_now2, df_last2 = fc.pre_processing(df_now_span, df_last_span, selected_base, selected_cate)
+#四分位処理
 
-    s_now2g = df_now2.groupby('品番')[selected_base].sum()
-    s_last2g = df_last2.groupby('品番')[selected_base].sum()
+items = []
+cnts = []
+quan25s = []
+medis = []
+quan75s = []
+quan90s = []
+maxs = []
+span2575s = []
+den_cnts = []
+den_maxs = []
+den_rates = []
+
+for item in df_now2['シリーズ名'].unique():
+    items.append(item)
+    df_item = df_now2[df_now2['シリーズ名']==item]
+    s_cust = df_item.groupby('得意先名')[selected_base].sum()
+    S_cust_den = df_item.groupby('得意先名')['伝票番号2'].nunique()
     
-    st.write(f'【今期数量】{s_now2g.sum(): .0f} 【前期数量】{s_last2g.sum(): .0f} \
-             【対前年比】{s_now2g.sum() / s_last2g.sum():.2f}')
-    
- 
-    
-    #数量データ分布一覧/itemベース
-    df_calc = fc.make_bunpu(df_now2, selected_base)
-    
-    st.markdown('##### 分布状況/年換算')
+    cnt = s_cust.count()
+    quan25 = round(s_cust.quantile(0.25), 1)
+    medi = s_cust.median()
+    quan75 = round(s_cust.quantile(0.75), 1)
+    quan90 = round(s_cust.quantile(0.9), 1)
+    max_num = s_cust.max()
+    span2575 = quan75 - quan25
+    den_cnt = df_item['伝票番号2'].nunique()
+    den_max = S_cust_den.max()
+    den_rate = round(den_cnt / cnt, 1)
 
-    with st.expander('df_calc', expanded=False):
-        st.dataframe(df_calc)
-    
-    st.markdown('##### 分布状況中央値/年換算')
-    with st.expander("df_calc 中央値", expanded=False):
-        df_calc_median = df_calc[['得意先数', '中央値']]
-        st.dataframe(df_calc_median)
+    cnts.append(cnt)
+    quan25s.append(quan25)
+    medis.append(medi)
+    quan75s.append(quan75)
+    quan90s.append(quan90)
+    maxs.append(max_num)
+    span2575s.append(span2575)
+    den_cnts.append(den_cnt)
+    den_maxs.append(den_max)
+    den_rates.append(den_rate)
 
-    ######################################################### 品番選択
-    hinban_list = sorted(list(df_now2['商品コード2'].unique()))
-    hinbans = st.multiselect(
-        '品番の選択/複数可',
-        hinban_list,
-        key='hinbans'
-    )
-    s_now = s_now2g[hinbans]
+df_calc = pd.DataFrame(list(zip(cnts, quan25s, medis, quan75s, quan90s, maxs, span2575s, den_cnts, \
+                                den_maxs, den_rates)), \
+                columns=['得意先数', '第2四分位', '中央値', '第3四分位', '上位10%', '最大値', 'span2575', \
+                            '伝票数', '伝票数/max', '伝票数/得意先数'], index=items)
 
-    st.write(df_calc.loc[hinbans])
+st.write(df_calc)
 
-    #前年の売上がない商品の対処
-    for hinban in hinbans:
-        if hinban in s_last2g.index:
-            continue
-        else:
-            s_last2g[hinban] = 0
 
-    s_last = s_last2g[hinbans]
 
-#*****************************************************メイン
-def main():
-    # アプリケーション名と対応する関数のマッピング
-    apps = {
-        '-': None,
-        'アイテム売上予測': pred_itemsales,
+st.markdown('#### シリーズ分析')
 
-    }
-    selected_app_name = st.sidebar.selectbox(label='分析項目の選択',
-                                             options=list(apps.keys()))                                     
 
-    if selected_app_name == '-':
-        st.info('サイドバーから分析項目を選択してください')
-        st.stop()
+total_now = s_cust_product.sum()
 
-    # 選択されたアプリケーションを処理する関数を呼び出す
-    render_func = apps[selected_app_name]
-    render_func()
-
-    link = '[home](https://cocosan1-hidastreamlit4-linkpage-7tmz81.streamlit.app/)'
-    st.sidebar.markdown(link, unsafe_allow_html=True)
-    st.sidebar.caption('homeに戻る') 
-
-if __name__ == '__main__':
-    main()
+#可視化
+st.markdown('##### 数量の分布/箱ひげ')
+st.write('得意先数')
+st.write(len(s_cust_product))
+graph.make_box_now(s_cust_product,  '今期')
