@@ -366,7 +366,7 @@ def make_bunpu(df_now2, selected_base):
         quan75 = round(s_cust.quantile(0.75), 1)
         quan90 = round(s_cust.quantile(0.9), 1)
         max_num = s_cust.max()
-        span2575 = quan75 - quan25
+        span2575 = round((quan75 + quan25) /2) #平均値
         den_cnt = df_item['伝票番号2'].nunique()
         den_max = S_cust_den.max()
         den_rate = round(den_cnt / cnt, 1)

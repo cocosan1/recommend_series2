@@ -14,8 +14,8 @@ from sklearn.neighbors import NearestNeighbors
 import func_collection as fc
 from func_collection import Graph
 
-st.set_page_config(page_title='分析2')
-st.markdown('## 分析2')
+st.set_page_config(page_title='分析2 品番別')
+st.markdown('## 分析2 品番別')
 
 #*******************************************************************************データ取り込み＋加工
 @st.cache_data(ttl=datetime.timedelta(hours=1))
@@ -106,7 +106,7 @@ df_now_year['金額'] = df_now_year['金額'].round(1)
 df_last_year['金額'] = df_last_year['金額'].round(1)
 
 selected_span = st.selectbox(
-    '売上レンジを指定',
+    '売上レンジを指定: 年換算',
     ['全得意先', '500万未満', '500万-1000万', '1000万-1500万', '1500万-2000万', '2000万以上'],
     key='range')
 
@@ -245,35 +245,34 @@ def overview():
 
     col1, col2 = st.columns(2)
     with col1:
-        st.markdown('#### 今期/偏差値 Top30')
+        st.markdown('###### 今期/偏差値 Top30')
         df_nowlast = df_nowlast.sort_values('偏差値/今期', ascending=False)
         df_nowtemp = df_nowlast[0:30]
         df_nowtemp = df_nowtemp.sort_values('偏差値/今期', ascending=True)
 
-        graph.make_bar_h_nonline(df_nowtemp['偏差値/今期'], df_nowtemp.index, \
+        with st.expander('グラフ/一覧', expanded=False):
+            graph.make_bar_h_nonline(df_nowtemp['偏差値/今期'], df_nowtemp.index, \
                                  '今期', '偏差値/今期', 700)
-        
-        #item数
-        cnt_item = len(s_now2g)
-        st.write(f'item: {cnt_item}')
-
-        with st.expander('df_nowlast["偏差値/今期"]', expanded=False):
+            #item数
+            cnt_item = len(s_now2g)
+            st.write(f'item: {cnt_item}')
             st.dataframe(df_nowlast["偏差値/今期"])
     
     with col2:
-        st.markdown('#### 前期/偏差値 Top30')
+        st.markdown('###### 前期/偏差値 Top30')
         df_nowlast = df_nowlast.sort_values('偏差値/前期', ascending=False)
         df_lasttemp = df_nowlast[0:30]
         df_lasttemp = df_lasttemp.sort_values('偏差値/前期', ascending=True)
 
-        graph.make_bar_h_nonline(df_lasttemp['偏差値/前期'], df_lasttemp.index, \
+        
+
+        with st.expander('グラフ/一覧', expanded=False):
+            graph.make_bar_h_nonline(df_lasttemp['偏差値/前期'], df_lasttemp.index, \
                                  '前期', '偏差値/前期', 700)
         
-        #item数
-        cnt_item = len(s_last2g)
-        st.write(f'item: {cnt_item}')
-
-        with st.expander('df_nowlast["偏差値/前期"]', expanded=False):
+            #item数
+            cnt_item = len(s_last2g)
+            st.write(f'item: {cnt_item}')
             st.dataframe(df_nowlast["偏差値/前期"])
 
 
@@ -295,7 +294,7 @@ def overview():
     st.markdown('#### 偏差値推移Top30')
     graph.make_bar_h_nonline(df30['偏差値/推移'], df30.index, '推移', '偏差値推移/対前年', 700)
 
-    with st.expander('df_nowlast', expanded=False):
+    with st.expander('今期前期一覧', expanded=False):
         st.dataframe(df_nowlast)
 
 
@@ -303,10 +302,10 @@ def overview():
     df_calc = fc.make_bunpu(df_now2, selected_base)
     
     st.markdown('#### 分布状況/アイテムベース')
-    with st.expander('df_calc', expanded=False):
+    with st.expander('四分位分布状況一覧', expanded=False):
         st.dataframe(df_calc)
 
-    st.markdown('##### 下限ライン')
+    st.markdown('##### 絞り込み下限ライン')
     line_cust = st.number_input('得意先数', value=0, key='line_cust')
     line_25 = st.number_input('第2四分位', value=0, key='line_25')
     line_medi = st.number_input('中央値', value=0, key='line_medi')
@@ -327,7 +326,7 @@ def overview():
     df_calc2 = df_calc2[df_calc2['伝票数/max'] >= denmax]
     df_calc2 = df_calc2[df_calc2['伝票数/得意先数'] >= denrate]
 
-    with st.expander('df_calc', expanded=False):
+    with st.expander('四分位分布状況一覧 絞り込み後', expanded=False):
         st.dataframe(df_calc2)
 
     st.markdown('#### 品番分析')
