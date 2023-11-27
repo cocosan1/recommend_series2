@@ -30,7 +30,7 @@ def make_data_now(file):
     df_now['張地'] = df_now['商　品　名'].apply(lambda x: x.split()[2] if len(x.split()) >= 4 else '')
 
     # ***INT型への変更***
-    df_now[['数量', '金額', '原価金額']] = df_now[['数量', '金額', '原価金額']].fillna(0).astype('int64')
+    df_now[['数量', '金額', '原価金額']] = df_now[['数量', '金額', '原価金額']].fillna(0).astype('int')
     #fillna　０で空欄を埋める
 
     return df_now
@@ -47,7 +47,7 @@ def make_data_last(file):
     df_last['張地'] = df_last['商　品　名'].apply(lambda x: x.split()[2] if len(x.split()) >= 4 else '')
 
     # ***INT型への変更***
-    df_last[['数量', '金額', '原価金額']] = df_last[['数量', '金額', '原価金額']].fillna(0).astype('int64')
+    df_last[['数量', '金額', '原価金額']] = df_last[['数量', '金額', '原価金額']].fillna(0).astype('int')
     #fillna　０で空欄を埋める
 
     return df_last        
@@ -124,14 +124,18 @@ df_now_span = pd.DataFrame()
 df_last_span = pd.DataFrame()
 
 if selected_span == '全得意先':
-    df_now_span = df_now.copy()
-    df_last_span = df_last.copy()
+    df_now_span = df_now_year.copy()
+    df_last_span = df_last_year.copy()
+
+    st.write(f'【全得意先数】{len(s_now)}')
 
 elif selected_span == '500万未満':
     s_now_selected = s_now[(s_now >= 0) & (s_now < 5000000)]
     index_list = s_now_selected.index
 
     df_now_span, df_last_span = select_df(index_list)
+
+    st.write(f'【全得意先数】{len(s_now)} 【当該得意先数】{len(index_list)} 【構成比】{len(index_list) / len(s_now) : .2f}')
     
 elif selected_span == '500万-1000万':
     s_now_selected = s_now[(s_now >= 5000000) & (s_now < 10000000)]
@@ -139,11 +143,15 @@ elif selected_span == '500万-1000万':
     
     df_now_span, df_last_span = select_df(index_list)
 
+    st.write(f'【全得意先数】{len(s_now)} 【当該得意先数】{len(index_list)} 【構成比】{len(index_list) / len(s_now) : .2f}')
+
 elif selected_span == '1000万-1500万':
     s_now_selected = s_now[(s_now >= 10000000) & (s_now < 15000000)]
     index_list = s_now_selected.index
     
     df_now_span, df_last_span = select_df(index_list)
+
+    st.write(f'【全得意先数】{len(s_now)} 【当該得意先数】{len(index_list)} 【構成比】{len(index_list) / len(s_now) : .2f}')
 
 elif selected_span == '1500万-2000万':
     s_now_selected = s_now[(s_now >= 15000000) & (s_now < 20000000)]
@@ -151,11 +159,16 @@ elif selected_span == '1500万-2000万':
     
     df_now_span, df_last_span = select_df(index_list)
 
+    st.write(f'【全得意先数】{len(s_now)} 【当該得意先数】{len(index_list)} 【構成比】{len(index_list) / len(s_now) : .2f}')
+
 elif selected_span == '2000万以上':
     s_now_selected = s_now[(s_now >= 20000000)]
     index_list = s_now_selected.index
     
     df_now_span, df_last_span = select_df(index_list)
+
+    st.write(f'【全得意先数】{len(s_now)} 【当該得意先数】{len(index_list)} 【構成比】{len(index_list) / len(s_now) : .2f}')
+
 
 #*****************************************************graphインスタンス
 graph = Graph()
@@ -364,13 +377,17 @@ def overview():
     
     st.markdown('##### 年間販売予測')
 
-    data_span =  (df_now['受注日'].max() - df_now['受注日'].min()).days
-    #days属性を使用してTimedeltaオブジェクトの日数を取得
-    span_rate = 365 / data_span
+    # data_span =  (df_now['受注日'].max() - df_now['受注日'].min()).days
+    # #days属性を使用してTimedeltaオブジェクトの日数を取得
+    # span_rate = 365 / data_span
     
-    st.write(f'■ 中央値: {round(s_cust_now.median()*span_rate)}')
-    st.write(f'■ 上位90%: {round(s_cust_now.quantile(0.9)*span_rate)}')
-    st.write(f'■ 最大値: {round(s_cust_now.max()*span_rate)}')
+    # st.write(f'■ 中央値: {round(s_cust_now.median()*span_rate, 1)}')
+    # st.write(f'■ 上位90%: {round(s_cust_now.quantile(0.9)*span_rate, 1)}')
+    # st.write(f'■ 最大値: {round(s_cust_now.max()*span_rate, 1)}')
+
+    st.write(f'■ 中央値: {round(s_cust_now.median(), 1)}')
+    st.write(f'■ 上位10%: {round(s_cust_now.quantile(0.9), 1)}')
+    st.write(f'■ 最大値: {round(s_cust_now.max(), 1)}')
     
     fc.fukabori2(hinban, df_now, df_now2, selected_base, graph)
 

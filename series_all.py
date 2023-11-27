@@ -237,9 +237,35 @@ df_calc = pd.DataFrame(list(zip(cnts, quan25s, medis, quan75s, quan90s, maxs, sp
 with st.expander('df_calc', expanded=False):
     st.write(df_calc)
 
-selected_col = st.selectbox('項目選択', df_calc.columns, key='selected_col')
+st.markdown('##### 下限ライン')
+line_cust = st.number_input('得意先数', value=0, key='line_cust')
+line_25 = st.number_input('第2四分位', value=0, key='line_25')
+line_medi = st.number_input('中央値', value=0, key='line_medi')
+line_75 = st.number_input('第3四分位', value=0, key='line_75')
+line_90 = st.number_input('上位10%', value=0, key='line_90')
+line_max = st.number_input('最大値', value=0, key='line_max')
+line_span = st.number_input('span2575', value=0, key='line_span')
+denmax = st.number_input('伝票数max', value=0, key='denmax')
+denrate = st.number_input('伝票数/得意先数', step=0.1, key='denrate')
 
-s_calc2 = df_calc[selected_col]
+df_calc2 = df_calc[df_calc['得意先数'] >= line_cust]
+df_calc2 = df_calc2[df_calc2['第2四分位'] >= line_25]
+df_calc2 = df_calc2[df_calc2['中央値'] >= line_medi]
+df_calc2 = df_calc2[df_calc2['第3四分位'] >= line_75]
+df_calc2 = df_calc2[df_calc2['上位10%'] >= line_90]
+df_calc2 = df_calc2[df_calc2['最大値'] >= line_max]
+df_calc2 = df_calc2[df_calc2['span2575'] >= line_span]
+df_calc2 = df_calc2[df_calc2['伝票数/max'] >= denmax]
+df_calc2 = df_calc2[df_calc2['伝票数/得意先数'] >= denrate]
+
+with st.expander('df_calc', expanded=False):
+    st.dataframe(df_calc2)
+
+
+
+selected_col = st.selectbox('項目選択', df_calc2.columns, key='selected_col')
+
+s_calc2 = df_calc2[selected_col]
 s_calc2 = s_calc2.sort_values(ascending=True)
 
 with st.expander('df_calc2', expanded=False):

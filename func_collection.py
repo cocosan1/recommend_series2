@@ -366,7 +366,7 @@ def make_bunpu(df_now2, selected_base):
         quan75 = round(s_cust.quantile(0.75), 1)
         quan90 = round(s_cust.quantile(0.9), 1)
         max_num = s_cust.max()
-        span2575 = round((quan75 + quan25) /2) #平均値
+        span2575 = round((quan75 + quan25) /2, 1) #平均値
         den_cnt = df_item['伝票番号2'].nunique()
         den_max = S_cust_den.max()
         den_rate = round(den_cnt / cnt, 1)
@@ -752,6 +752,7 @@ def fukabori2(hinban, df_now, df_now2, selected_base, graph):
     )
 
     df_color = df_select[df_select['塗色CD']==selected_color]
+
     s_fab = df_color.groupby('張地')['数量'].sum()
 
     s_fab = s_fab.sort_values(ascending=True)
@@ -827,15 +828,15 @@ def fukabori2(hinban, df_now, df_now2, selected_base, graph):
             col_list = ['得意先名', '商　品　名', '数量', '伝票番号2']
             st.table(df_concat[col_list])
         
-    #箱ひげ
-    df_hinban_now = df_now2[df_now2['品番']==hinban]
-    s_cust_now = df_hinban_now.groupby('得意先名')[selected_base].sum()
+    # #箱ひげ
+    # df_hinban_now = df_now2[df_now2['品番']==hinban]
+    # s_cust_now = df_hinban_now.groupby('得意先名')[selected_base].sum()
 
-    #可視化
-    st.markdown('##### 数量の分布/箱ひげ')
-    st.write('得意先数')
-    st.write(len(s_cust_now))
-    graph.make_box_now(s_cust_now, '今期')
+    # #可視化
+    # st.markdown('##### 数量の分布/箱ひげ')
+    # st.write('得意先数')
+    # st.write(len(s_cust_now))
+    # graph.make_box_now(s_cust_now, '今期')
 
     #月次推移
     st.markdown('##### 月次推移')
@@ -848,21 +849,21 @@ def fukabori2(hinban, df_now, df_now2, selected_base, graph):
 
     #試算
     
-    st.markdown('##### 年間販売予測')
+    # st.markdown('##### 年間販売予測')
 
-    data_span =  (df_now['受注日'].max() - df_now['受注日'].min()).days
-    #days属性を使用してTimedeltaオブジェクトの日数を取得
-    span_rate = 365 / data_span
+    # data_span =  (df_now['受注日'].max() - df_now['受注日'].min()).days
+    # #days属性を使用してTimedeltaオブジェクトの日数を取得
+    # span_rate = 365 / data_span
     
-    if len(s_cust_now) == 0:
-        st.write('購入実績がありません')
-    else:
-        med = s_cust_now.median()*span_rate
-        st.write(f'■ 中央値: {round(med)}')
-        q90 = s_cust_now.quantile(0.9)*span_rate
-        st.write(f'■ 上位90%: {round(q90)}')
-        q100 = s_cust_now.max()*span_rate
-        st.write(f'■ 最大値: {round(q100)}')
+    # if len(s_cust_now) == 0:
+    #     st.write('購入実績がありません')
+    # else:
+    #     med = s_cust_now.median()*span_rate
+    #     st.write(f'■ 中央値: {round(med)}')
+    #     q90 = s_cust_now.quantile(0.9)*span_rate
+    #     st.write(f'■ 上位90%: {round(q90)}')
+    #     q100 = s_cust_now.max()*span_rate
+    #     st.write(f'■ 最大値: {round(q100)}')
     
     link = '[アソシエーション分析](https://cocosan1-association-fullhinban-cmy4cf.streamlit.app/)'
     st.markdown(link, unsafe_allow_html=True)
