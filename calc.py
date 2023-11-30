@@ -508,8 +508,8 @@ def overview_now():
         #plotly_chart plotlyを使ってグラグ描画　グラフの幅が列の幅
     
     st.write('年換算/得意先絞り込み')
-    fc.fukabori3(df_now_span, df_last_span, selected_base, selected_cate, graph)
-
+    # fc.fukabori3(df_now_span, df_last_span, selected_base, selected_cate, graph)
+    fc.fukabori3(df_now, df_last, selected_base, selected_cate, graph)
 
 # #*****************************************************数量ランキング/購入した得意先＋アイテム　スケール調整
 
@@ -1001,84 +1001,7 @@ def tenji():
         st.write(f'順位: {df_sum2.index.get_loc(cust_name) + 1}')
         st.write(f'売上: {df_sum2.loc[cust_name]["金額"]}')
     
-        # #**********************************************************************アイテムベース
-        # #**************************************************最近傍探索
-        
-        # st.markdown('### レコメンド/アイテムベース')
-
-        # df_nowbase = pd.DataFrame(index=df_now['得意先名'].unique())
-        # for item in df_now['商品コード2'].unique():
-        #     items.append(item)
-        #     df_item = df_now[df_now['商品コード2']==item]
-        #     s_cust = df_item.groupby('得意先名')['数量'].sum()
-        #     df = pd.DataFrame(s_cust)
-        #     df.rename(columns={'数量': item}, inplace=True)
-        #     df_nowbase = df_nowbase.merge(df, left_index=True, right_index=True, how='left')
-        #     df_nowbase = df_nowbase.fillna(0)
-        
-        # with st.expander('df_nowbase', expanded=False):
-        #     st.dataframe(df_nowbase)
-        
-        # df_target = df_nowbase[df_nowbase.index == cust_name]
-
-        # #疎行列（ほとんどが0の行列）アイテム/ユーザー行列
-        # #dfをアイテム列だけに絞る
-        # df_target = df_target.fillna(0)
-
-        # with st.expander('index target/col item/df 横長: df_target'):
-        #     st.write(df_target)
-        
-        # #最近傍探索の準備
-        # df_nowbaset = df_nowbase.T #index:商品/col:得意先
-        # with st.expander('index item/col item df_nowbaset', expanded=False):
-        #     st.write(df_nowbaset)
-        
-        # #標準化
-        # df_nowbaset_std = scale(df_nowbaset, axis=1)
-        # #indexを追加
-        # df_nowbaset_std = pd.DataFrame(df_nowbaset_std, index=df_nowbaset.index)
-        # with st.expander('df_nowbaset_std', expanded=False):
-        #     st.write(df_nowbaset_std)
-
-        # #アイテム同士の距離の計算
-        # def distance(itemname_a, itemname_b):
-        #     a = df_nowbaset_std.loc[itemname_a]
-        #     list_a = list(a)
-
-        #     b = df_nowbaset_std.loc[itemname_b]
-        #     list_b = list(b)
-
-        #     list_dist = spatial.distance.cosine(list_a, list_b)
-
-        #     return list_dist
-        
-        # #近いアイテムの抽出
-        # def get_neighbors(item_name):
-        #     dist_dict = {}
-        #     for item in df_nowbaset_std.index:
-        #         if (item != item_name):
-        #             dist = distance(item_name, item)
-        #             dist_dict[item] = dist
-                
-                    
-        #     df = pd.DataFrame(dist_dict, index=['distance']).T
-        #     df = df[df['distance'] < 0.45]
-        #     df = df.sort_values('distance', ascending=True)
-
-        #     return df
-    
-        
-        # df_neigh = pd.DataFrame()
-        # for item_name in s_cust_std.index:
-        #     df = get_neighbors(item_name)
-        #     df = df.rename(columns={'distance': item_name})
-        #     df_neigh = df_neigh.merge(df, left_index=True, right_index=True, how='outer')
-        # st.write(df_neigh)   
-
-
-
-
-
+######################### 相関分析
 def corr():
     st.markdown('### 相関分析')
 
@@ -1112,10 +1035,10 @@ def main():
         'アイテム別概要/前年比': overview,
         'アイテム別概要/今期 複数グラフ': overview_now,
         # '回転数/アイテム+店舗':cnt_per_cust,
-        'ピンポイント品番分析': pinpoint,
-        '展示分析': tenji,
-        '相関分析': corr,
-        'メモ': memo
+        # 'ピンポイント品番分析': pinpoint,
+        # '展示分析': tenji,
+        # '相関分析': corr,
+        # 'メモ': memo
           
     }
     selected_app_name = st.sidebar.selectbox(label='分析項目の選択',
